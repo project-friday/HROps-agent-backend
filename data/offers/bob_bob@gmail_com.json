@@ -1,14 +1,18 @@
 {
   "candidate": {
-    "name": "Samyak",
-    "email": "samyak@gmail.com",
-    "role": "Software Engineer"
+    "name": "Bob",
+    "email": "bob@gmail.com",
+    "application_id": "APP12346",
+    "role": "Backend Engineer",
+    "level": "L2",
+    "location": "Bangalore",
+    "work_model": "Hybrid (3 days onsite)"
   },
   "offer": {
     "status": "preparing",
     "eta_hours": 48,
     "summary": {
-      "title": "Software Engineer",
+      "title": "Backend Engineer",
       "level": "L2",
       "base": "₹12,00,000",
       "variable": "10%",

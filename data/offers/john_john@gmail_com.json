@@ -3,7 +3,7 @@
     "name": "John",
     "email": "John@gmail.com",
     "application_id": "APP12345",
-    "role": "Software Engineer",
+    "role": "Data Engineer",
     "level": "L2",
     "location": "Bangalore Campus, Tower 3",
     "work_model": "Hybrid (3 days onsite)"
@@ -82,16 +82,16 @@
     },
     "joining_deferral": {
       "requested": true,
-      "new_date": "2025-10-08"
+      "new_date": "2025-09-16"
     },
     "visa_support": {
       "required": false,
       "status": null
     }
   },
-      "bgv": {
-      "status": "pending",
-      "expected_days": "5-10",
-      "remarks": "Starts after offer acceptance and document upload"
-    }
+  "bgv": {
+    "status": "pending",
+    "expected_days": "5-10",
+    "remarks": "Starts after offer acceptance and document upload"
+  }
 }

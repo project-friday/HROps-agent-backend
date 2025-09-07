@@ -1,0 +1,14 @@
+{
+  "application_id": "A-014",
+  "email": "bob@gmail.com",
+  "name": "Bob",
+  "phone": "+91 98xxxxxx12",
+  "job_id": "JR-202",
+  "job_title": "Backend Engineer",
+  "status": "selected",
+  "resume_reviewed": "Yes",
+  "updated_at": "2025-09-01T09:30:00Z",
+  "response_timeframe": "2 weeks",
+  "description": "Congratulations! You have been selected in the interview. Our HR team will contact you with next steps and offer details.",
+  "application_status": "Selected"
+}
