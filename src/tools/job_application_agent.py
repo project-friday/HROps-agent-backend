@@ -3,8 +3,9 @@
 import re
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
+from zoneinfo import ZoneInfo
 from livekit.agents import RunContext
 # from src.agents.onboarding import OnboardingAgent
 from livekit.agents import function_tool  # decorator used by the agent to call tools
@@ -42,8 +43,300 @@ def _humanize_updated_at(ts: Optional[str]) -> str:
     except Exception:
         return str(ts)
 
+# ---------- Interview helpers (new) ----------
+
+def _load_record_by_application_id(application_id: str) -> tuple[dict, Path] | tuple[None, None]:
+    """
+    Scan data/applications for the given application_id and return (record, path).
+    """
+    # Try filename pattern first (fast path)
+    fp = next(iter(APPS_DIR.glob(f"{application_id}_*.json")), None)
+    if fp is None:
+        # Fallback: scan contents if filenames don't follow pattern
+        for cand in APPS_DIR.glob("*.json"):
+            try:
+                rec = json.loads(cand.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if str(rec.get("application_id", "")).strip().lower() == str(application_id).strip().lower():
+                return rec, cand
+        return None, None
+
+    try:
+        rec = json.loads(fp.read_text(encoding="utf-8"))
+        return rec, fp
+    except Exception:
+        return None, None
+
+
+def _iso_to_dt(s: str) -> datetime | None:
+    if not s:
+        return None
+    s = str(s).strip()
+    if s.endswith("Z"):
+        s = s.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+
+def _dt_to_iso(dt: datetime) -> str:
+    # Store up to minutes (cleaner for speech + logs)
+    return dt.isoformat(timespec="minutes")
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _is_business_slot(dt: datetime, tz_name: str) -> bool:
+    """
+    Accept weekday (Mon–Fri) and 09:00–18:00 in interview's local timezone.
+    dt must be timezone-aware.
+    """
+    try:
+        local = dt.astimezone(ZoneInfo(tz_name))
+    except Exception:
+        local = dt  # fallback if tz is weird
+
+    if local.weekday() >= 5:  # 5=Sat, 6=Sun
+        return False
+
+    start = local.replace(hour=9, minute=0, second=0, microsecond=0)
+    end   = local.replace(hour=18, minute=0, second=0, microsecond=0)
+    return start <= local <= end
+
+
+def _suggest_alternatives(base_dt: datetime, tz_name: str, count: int = 2) -> list[str]:
+    """
+    Offer up to 2 nearby business-hour options (10:00, 15:00 local).
+    """
+    alt: list[str] = []
+    try:
+        local = base_dt.astimezone(ZoneInfo(tz_name))
+    except Exception:
+        local = base_dt
+
+    candidates: list[datetime] = []
+    for hour in (10, 15):
+        cand = local.replace(hour=hour, minute=0, second=0, microsecond=0)
+        # If in the past or weekend, roll forward to next weekday at same hour
+        while cand <= _now_utc().astimezone(local.tzinfo) or cand.weekday() >= 5:
+            cand = (cand + timedelta(days=1)).replace(hour=hour, minute=0, second=0, microsecond=0)
+        candidates.append(cand)
+
+    for c in candidates:
+        if _is_business_slot(c, tz_name):
+            # Return in the same timezone/offset as base_dt
+            alt.append(_dt_to_iso(c.astimezone(base_dt.tzinfo)))
+        if len(alt) >= count:
+            break
+    return alt
 
 # ---------- Tool: list all apps for an email (login + fan-out) ----------
+
+@function_tool(description="""
+Return the upcoming interview for an application, if any (scheduled or rescheduled in the future).
+Use after the user has selected which application to manage.
+""")
+async def get_upcoming_interview(application_id: str) -> dict:
+    """
+    Returns:
+      {
+        "has_interview": bool,
+        "interview": { ... } | {},
+        "application_id": str
+      }
+    """
+    rec, fp = _load_record_by_application_id(application_id)
+    if not rec:
+        return {"has_interview": False, "interview": {}, "application_id": application_id}
+
+    itv = rec.get("interview") or {}
+    status = str(itv.get("status") or "").lower()
+    scheduled_at = _iso_to_dt(itv.get("scheduled_at"))
+    if scheduled_at and scheduled_at.tzinfo is None:
+        scheduled_at = scheduled_at.replace(tzinfo=timezone.utc)
+
+    if status in {"scheduled", "rescheduled"} and scheduled_at and scheduled_at > _now_utc():
+        return {
+            "has_interview": True,
+            "interview": {
+                "status": status,
+                "scheduled_at": _dt_to_iso(scheduled_at),
+                "timezone": itv.get("timezone") or "Asia/Kolkata",
+                "mode": itv.get("mode") or "video",
+                "location_or_link": itv.get("location_or_link") or "",
+                "interviewer": itv.get("interviewer") or "",
+            },
+            "application_id": application_id,
+        }
+
+    return {"has_interview": False, "interview": {}, "application_id": application_id}
+
+@function_tool(description="""
+Check if the interview panel is available at the proposed time for this application.
+- Expects ISO-8601 with timezone offset (e.g., 2025-09-12T10:00:00+05:30).
+- Simple rule: time must be in the future, on a weekday, and between 09:00–18:00 in the interview's timezone.
+- Does NOT modify any data. Use this before asking the user to confirm booking.
+""")
+async def check_interview_availability(application_id: str, proposed_time_iso: str) -> dict:
+    """
+    Returns:
+      {
+        "ok": bool,
+        "reason": str | null,
+        "suggested": [iso, ...] | null,
+        "normalized_time": str | null,   # ISO string for the proposed time, normalized
+        "timezone": str | null
+      }
+    """
+    rec, fp = _load_record_by_application_id(application_id)
+    if not rec:
+        return {
+            "ok": False,
+            "reason": "not_found",
+            "suggested": None,
+            "normalized_time": None,
+            "timezone": None,
+        }
+
+    itv = rec.get("interview")
+    if not itv:
+        return {
+            "ok": False,
+            "reason": "no_interview",
+            "suggested": None,
+            "normalized_time": None,
+            "timezone": None,
+        }
+
+    new_dt = _iso_to_dt(proposed_time_iso)
+    if not new_dt:
+        return {
+            "ok": False,
+            "reason": "invalid_time",
+            "suggested": None,
+            "normalized_time": None,
+            "timezone": itv.get("timezone") or "Asia/Kolkata",
+        }
+
+    tz_name = itv.get("timezone") or "Asia/Kolkata"
+
+    # Must be in the future
+    if new_dt <= _now_utc():
+        suggestions = _suggest_alternatives(
+            _now_utc().astimezone(new_dt.tzinfo) + timedelta(hours=2),
+            tz_name
+        )
+        return {
+            "ok": False,
+            "reason": "past_time",
+            "suggested": suggestions,
+            "normalized_time": None,
+            "timezone": tz_name,
+        }
+
+    # Must be a business slot
+    if not _is_business_slot(new_dt, tz_name):
+        suggestions = _suggest_alternatives(new_dt, tz_name)
+        return {
+            "ok": False,
+            "reason": "outside_business_hours",
+            "suggested": suggestions,
+            "normalized_time": None,
+            "timezone": tz_name,
+        }
+
+    # Looks good—return normalized ISO (minutes precision) and tz
+    return {
+        "ok": True,
+        "reason": None,
+        "suggested": None,
+        "normalized_time": _dt_to_iso(new_dt),
+        "timezone": tz_name,
+    }
+
+@function_tool(description="""
+Reschedule the interview for an application to a new time.
+- Expects ISO-8601 with timezone offset (e.g., 2025-09-12T10:00:00+05:30).
+- Simple availability check: future time, weekday, and 09:00–18:00 in the interview's timezone.
+- On success: updates JSON in place and returns the updated interview.
+- On failure: returns ok=false with 'reason' and optional 'suggested' alternatives.
+""")
+async def reschedule_interview(application_id: str, new_time_iso: str, reason: str = "candidate_request") -> dict:
+    """
+    Returns:
+      {
+        "ok": bool,
+        "reason": str | null,
+        "suggested": [iso, ...] | null,
+        "interview": { ... } | {}
+      }
+    """
+    rec, fp = _load_record_by_application_id(application_id)
+    if not rec:
+        return {"ok": False, "reason": "not_found", "suggested": None, "interview": {}}
+
+    itv = rec.get("interview")
+    if not itv:
+        return {"ok": False, "reason": "no_interview", "suggested": None, "interview": {}}
+
+    new_dt = _iso_to_dt(new_time_iso)
+    if not new_dt:
+        return {"ok": False, "reason": "invalid_time", "suggested": None, "interview": {}}
+
+    tz_name = itv.get("timezone") or "Asia/Kolkata"
+
+    # Must be in the future
+    if new_dt <= _now_utc():
+        suggestions = _suggest_alternatives(_now_utc().astimezone(new_dt.tzinfo) + timedelta(hours=2), tz_name)
+        return {"ok": False, "reason": "past_time", "suggested": suggestions, "interview": {}}
+
+    # Must be within business hours on a weekday
+    if not _is_business_slot(new_dt, tz_name):
+        suggestions = _suggest_alternatives(new_dt, tz_name)
+        return {"ok": False, "reason": "outside_business_hours", "suggested": suggestions, "interview": {}}
+
+    # Passed checks → update the JSON
+    old_time = itv.get("scheduled_at")
+    itv["scheduled_at"] = _dt_to_iso(new_dt)
+    itv["status"] = "rescheduled"
+
+    # Optional small audit trail
+    trail = rec.get("reschedules")
+    if not isinstance(trail, list):
+        trail = []
+    trail.append({
+        "old_time": old_time,
+        "new_time": itv["scheduled_at"],
+        "changed_at": _dt_to_iso(_now_utc()),
+        "reason": reason,
+    })
+    rec["reschedules"] = trail
+
+    rec["updated_at"] = _dt_to_iso(_now_utc())
+
+    try:
+        fp.write_text(json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        return {"ok": False, "reason": f"write_failed: {e}", "suggested": None, "interview": {}}
+
+    return {
+        "ok": True,
+        "reason": None,
+        "suggested": None,
+        "interview": {
+            "status": itv["status"],
+            "scheduled_at": itv["scheduled_at"],
+            "timezone": tz_name,
+            "mode": itv.get("mode") or "video",
+            "location_or_link": itv.get("location_or_link") or "",
+            "interviewer": itv.get("interviewer") or "",
+        },
+    }
+
 
 @function_tool(
     description="""
@@ -416,3 +709,20 @@ async def query_knowledge_base(question: str, top_k: int = 4) -> dict:
         "answer": stitched,
         "snippets": snippets
     }
+#______________________________________________________________________________________________________________#
+#--------------------------------------------------------------------------------------------------------------#
+#______________________________________________________________________________________________________________#
+
+@function_tool
+async def handover_to_onboarding(context: RunContext[dict]) -> tuple[str, object]:
+    # Local import to avoid circular imports
+    from src.agents.onboarding import OnboardingAgent
+    from livekit import rtc
+
+    return (
+        OnboardingAgent(room=rtc.Room),  # <-- no chat_ctx kwarg
+    )
+
+#______________________________________________________________________________________________________________#
+#--------------------------------------------------------------------------------------------------------------#
+#______________________________________________________________________________________________________________#
