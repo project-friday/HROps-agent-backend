@@ -23,6 +23,10 @@ from livekit.plugins import silero, assemblyai, elevenlabs
 # from src.agents.job_application import JobApplicationAgent
 # from src.agents.onboarding import OnboardingAgent
 from src.agents.router import RouterAgent
+from src.models.data import CandidateData
+
+
+
 
 # Load .env from repo root
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +36,9 @@ if not os.getenv("OPENAI_API_KEY"):
 
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
-    session = AgentSession()
+    session=AgentSession[CandidateData](
+        userdata=CandidateData(),
+    )
     # attach disconnect handler
     # @ctx.room.on("participant_disconnected")
     # async def _on_disconnected(_):
