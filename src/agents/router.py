@@ -3,7 +3,8 @@ from livekit.agents import Agent, function_tool, RunContext
 from livekit import rtc
 from src.agents.job_application import JobApplicationAgent
 from src.agents.onboarding import OnboardingAgent
-from livekit.plugins import assemblyai, elevenlabs,openai
+from livekit.plugins import assemblyai, elevenlabs,openai, silero
+
 
 ROUTER_INSTRUCTIONS = """
 You are **Eve** from the Walmart HR Department acting as the **router**. Decide which domain should handle the user’s request and call exactly one transfer tool:
@@ -16,9 +17,14 @@ VOICE & PERSONA
 - Never reveal internal routing, tools, or agents.
 - Never say “I’ve connected you…”, “switching”, “handover”, or “router”.
 
+PRE-TOOL FILLERS (ROTATE; ≤1.5s; MAX ONE PER CALL)
+- Say ONE short filler before calling a tool (rotate; don’t repeat back-to-back):
+  “One sec…”, “Alright, give me a moment…”, “Okay, let me check…”, “Just a moment…”, “Got it—pulling that up for you…”, “Hold on a second…”, “Let me fetch that…”, “Sure—checking now…”
+
 GREETING (ONCE ONLY)
 - If—and only if—this is the first turn of the session and no greeting was sent, say:
   "Hey there, I’m Eve, speaking from Walmart HR Department. How may I help you?"
+- Always greet first, don't wait for the user to greet. And after greeting if the user says "hi" or "hello", do not greet again, instead say "Yeah... hi, how may I help you?".
 - Otherwise, do not greet again. Route silently.
 
 NOTE:
@@ -73,8 +79,10 @@ class RouterAgent(Agent):
         super().__init__(instructions=ROUTER_INSTRUCTIONS,
                          stt=assemblyai.STT(),
                         llm=openai.LLM(model="gpt-4.1"),
+                        vad=silero.VAD.load(),
                          tts=elevenlabs.TTS(
-                voice_id="wlmwDR77ptH6bKHZui0l",
+                # voice_id="wlmwDR77ptH6bKHZui0l",
+                voice_id="H8bdWZHK2OgZwTN7ponr",
                 model="eleven_multilingual_v2",
             )
 
@@ -94,5 +102,11 @@ class RouterAgent(Agent):
         return (
             JobApplicationAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
         )
+
+    # --- speaks immediately after the router becomes active ---
+    async def on_enter(self):
+        await self.session.say("Hey there, I’m Eve, speaking from Walmart HR Department. How may I help you?")
+
+    
 
 #______________________________________________________________________________________________________________#

@@ -1,15 +1,32 @@
 from livekit.agents import function_tool, RunContext
 
 @function_tool
-async def handover_to_onboarding(context: RunContext[dict]):
-    from src.agents.onboarding import OnboardingAgent
-    agent = context.session.current_agent
-    onboarding_agent = OnboardingAgent(chat_ctx=context.session._chat_ctx, room=agent.room)
-    return onboarding_agent, "wait for a moment"
+async def handover_to_onboarding(
+    context: RunContext[dict],
+    name: str | None = None,
+    email: str | None = None,
+):
+    from src.agents.onboarding import OnboardingAgent  # avoid circular import
+    s = context.session
+    s.state = {**getattr(s, "state", {}), "name": name, "email": email}
+    agent = s.current_agent
+    # return ONLY the next agent (silent handover)
+    return OnboardingAgent(room=agent.room, chat_ctx=s._chat_ctx)
+
 
 @function_tool
-async def handover_to_applications(context: RunContext[dict]):
-    from src.agents.job_application import JobApplicationAgent
-    agent = context.session.current_agent
-    job_application_agent = JobApplicationAgent(chat_ctx=context.session._chat_ctx, room=agent.room)
-    return job_application_agent, "wait for a moment"
+async def handover_to_applications(
+    context: RunContext[dict],
+    name: str | None = None,
+    email: str | None = None,
+):
+    from src.agents.job_application import JobApplicationAgent  # local import avoids cycles
+    s = context.session
+    s.state = {
+        **getattr(s, "state", {}),
+        "name": name,
+        "email": email,
+    }
+    agent = s.current_agent
+    # Return ONLY the next agent (silent handover; no mid-chat line)
+    return JobApplicationAgent(room=agent.room, chat_ctx=s._chat_ctx)
