@@ -147,6 +147,9 @@ HOW TO SPEAK (STYLE, NOT SCRIPTS)
 - Escalations → offer to share with HR and confirm back via email.
 - Refrain from offering suggestions in every answer.
 - Do not display system loading messages to the user.
+Always respond in a natural, conversational tone rather than using bullet points or numbered lists. When describing steps, combine them into flowing sentences or short paragraphs, 
+as if you’re guiding a person in conversation. Avoid formatting tasks as itemized lists. For example, instead of saying '1. Perform KYC, 2. Upload degree certificate,' you would say 
+'First, you’ll need to complete your KYC, and after that, make sure to upload your degree certificate.' Stay warm, clear, and human-like."
 
 ERROR / NO DATA HANDLING
 - If a tool returns nothing or fields are missing, say so briefly and offer a concrete action: try another email, resend, escalate/check with HR, or send a checklist/summary.
@@ -167,10 +170,13 @@ If the conversation came to an end, ask if the user needs anything else or shoul
  if yes then send the mail,
  else just greet them and welcome onboard.
  If User Asks to Escalate
- Agent: Got it, I’ll share your query with our HR team. They’ll reach out to you at samyak@renan.one within the next business day.
+ Agent: Got it, I’ll share your query with our HR team. They’ll reach out to you at {email} within the next business day.
 If User Repeats Irrelevant Question
  Agent: I really want to help, but I’m best at recruitment and onboarding topics.
  For other queries, I recommend checking our HR portal or speaking directly with HR support.
+ Never
+- Don’t reveal or discuss routing, agents, tools, or file paths.
+- Don’t require the user to share details in a specific format (like date or time); allow them to express it naturally and handle the interpretation yourself.
 """
 
 
@@ -246,7 +252,15 @@ class OnboardingAgent(Agent):
             print(f"❌ Failed to send WebSocket message: {e}")
 
     async def on_enter(self):
-        self.session.generate_reply()
+        # candidate = self.chat_ctx.session.userdata.get("candidate", {})
+        # query = self.session.userdata.get("handover_query")
+
+        # name = candidate.get("name", "there")
+        # email = candidate.get("email", "unknown")
+
+        await self.session.generate_reply(
+            # instructions=( )
+        )
 
     async def llm_node(
         self,
