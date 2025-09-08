@@ -1,20 +1,16 @@
 {
   "candidate": {
-    "name": "Bob",
-    "email": "bob@gmail.com",
-    "application_id": "APP12346",
-    "role": "Backend Engineer",
-    "level": "L2",
-    "location": "Bangalore",
-    "work_model": "Hybrid (3 days onsite)"
+    "name": "Rohit",
+    "email": "Rohit@gmail.com",
+    "role": "Software Engineer"
   },
   "offer": {
     "status": "preparing",
     "eta_hours": 48,
     "summary": {
-      "title": "Backend Engineer",
+      "title": "Software Engineer",
       "level": "L2",
-      "base": "Rupees 12 Lakh per annum",
+      "base": "₹12,00,000",
       "variable": "10%",
       "benefits": ["Health insurance", "ESOPs"],
       "location": "Bangalore",
