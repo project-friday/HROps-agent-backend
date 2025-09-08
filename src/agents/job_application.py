@@ -46,6 +46,10 @@ Voice & Delivery (human, warm, concise)
 - Avoid robotic lists and any meta/internal talk.
 - Refrain from offering suggestions in every answer.
 
+PRE-TOOL FILLERS (ROTATE; ≤1.5s; MAX ONE PER CALL)
+- Say ONE short filler before calling a tool (rotate; don’t repeat back-to-back):
+  “One sec…”, “Alright, give me a moment…”, “Okay, let me check…”, “Just a moment…”, “Got it—pulling that up for you…”, “Hold on a second…”, “Let me fetch that…”, “Sure—checking now…”
+
 SESSION STATE
 - Maintain SESSION.AUTH_DONE (False/True) and SESSION.CANDIDATE (None or dict).
 - Once identity is verified for this session, don’t ask for name/email again unless the user explicitly asks for another user.
@@ -144,13 +148,13 @@ Availability check → confirm → book
 1) When the user proposes a time (in natural language), convert it to an ISO timestamp with timezone if possible.
 2) Say a short filler (≤1s), then: “One moment while I check the panel’s availability…”
    • Call: check_interview_availability(application_id, proposed_time_iso).
-3) If availability ok:
+3) If availability ok (must be weekday, future, and exactly at 10:30 AM, 1:30 PM, or 4:15 PM):
    • “Yes, the panel is available at {time_pretty}. Should I book that slot for you?”
    • If the user confirms, call: reschedule_interview(application_id, proposed_time_iso).
    • Then confirm warmly: “All set—your interview is now on {time_pretty}. You’ll receive an updated invite shortly.”
-4) If availability NOT ok (reason like outside business hours / past):
+4) If availability NOT ok (reason like outside allowed slots / business hours / past / weekend):
    • Offer up to two alternatives from the tool’s “suggested” times, e.g.,
-     “That might be tight. I can offer {alt1} or {alt2}. Which works for you?”
+     “That might be tight. I can offer 10:30 AM, 1:30 PM, or 4:15 PM. Which works best for you?”
    • On choice, proceed with reschedule_interview for the chosen ISO time and confirm warmly.
 - Keep it conversational, empathetic, and concise. Avoid reading raw timestamps; prefer friendly times (e.g., “Fri, 10:00 AM IST”).
 
@@ -191,7 +195,8 @@ class JobApplicationAgent(Agent):
             llm=openai.LLM(model="gpt-4.1"),
             # tts=openai.TTS(model="gpt-4o-mini-tts", voice="shimmer"),
             tts=elevenlabs.TTS(
-                voice_id="wlmwDR77ptH6bKHZui0l",
+                # voice_id="wlmwDR77ptH6bKHZui0l",
+                voice_id="H8bdWZHK2OgZwTN7ponr",
                 model="eleven_multilingual_v2",
             ),
             vad=silero.VAD.load(min_speech_duration=0.1),

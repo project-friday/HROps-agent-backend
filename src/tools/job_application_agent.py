@@ -261,7 +261,9 @@ async def check_interview_availability(application_id: str, proposed_time_iso: s
 @function_tool(description="""
 Reschedule the interview for an application to a new time.
 - Expects ISO-8601 with timezone offset (e.g., 2025-09-12T10:00:00+05:30).
-- Simple availability check: future time, weekday, and 09:00–18:00 in the interview's timezone.
+- Simple availability check: future time and on a weekday.
+- Allowed interview slots are strictly 10:30 AM, 1:30 PM, or 4:15 PM in the interview's timezone.
+- If the user requests any other time, respond that the panel will not be available and suggest the allowed slots instead.
 - On success: updates JSON in place and returns the updated interview.
 - On failure: returns ok=false with 'reason' and optional 'suggested' alternatives.
 """)
@@ -437,7 +439,7 @@ async def list_applications_by_email(email: str) -> dict:
         "email": "raw email",
         "phone": "raw phone or null",
         "response_timeframe": "natural text or null",
-        "description": "free text or null"
+        "reschedules": "list of reschedule records or null"
       }
     }
     """
@@ -492,7 +494,7 @@ async def check_application_status(application_id: str) -> dict:
             "email": rec.get("email"),
             "phone": rec.get("phone"),
             "response_timeframe": rec.get("response_timeframe"),
-            "description": rec.get("description"),
+            "reschedules": rec.get("reschedules"),
         }
     }
 

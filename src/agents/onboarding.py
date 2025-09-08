@@ -35,8 +35,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-
-
 ONBOARDING_PROMPT = """
 You are Eve — a warm, natural HR assistant on a live call.
 
@@ -129,6 +127,12 @@ INTENT → TOOL ROUTING (DON’T SAY TOOL NAMES ALOUD)
   • If requested shift > 14 days from current joining date: don’t change the record; say you’ll share the request with HR and confirm back.
   • If ≤ 14 days: collect preferred date (YYYY-MM-DD) and call mark_deferral(name, email, new_date). Then confirm you’ll follow up once approved.
 
+- If the user wishes to negotiate (e.g., salary, CTC, benefits, notice period, or remote work), first ask them the reason for their request.
+
+  • If the negotiation is about salary, specifically ask why they believe they deserve a higher amount in just one short sentence.
+  • Record the details using `log_negotiation(name, email, topic, details)`.
+  • Let the user know that you will share their request with HR and confirm back via email.
+
 - IT assets & access →
   • If available in SESSION.CANDIDATE.it_assets, answer from there.
   • Normal windows: laptop shipping 3–5 days post acceptance; email/VPN ~48 hours before joining.
@@ -179,11 +183,6 @@ If User Repeats Irrelevant Question
 - Don’t require the user to share details in a specific format (like date or time); allow them to express it naturally and handle the interpretation yourself.
 """
 
-
-
-# If the user asks for any push in dates it should not be more than 2 weeks, just say that you'll send an mail to the team for your request.
-
-
 class OnboardingAgent(Agent):
     def __init__(self, room: rtc.Room, chat_ctx=None):
         self.room = room
@@ -193,7 +192,8 @@ class OnboardingAgent(Agent):
         stt=assemblyai.STT(),
         # tts=openai.TTS(model="gpt-4o-mini-tts", voice="shimmer"),
         tts=elevenlabs.TTS(
-                voice_id="wlmwDR77ptH6bKHZui0l",
+                # voice_id="wlmwDR77ptH6bKHZui0l",
+                voice_id="H8bdWZHK2OgZwTN7ponr",
                 model="eleven_multilingual_v2",
             ),
         llm=openai.LLM(model="gpt-4.1"),

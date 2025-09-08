@@ -18,7 +18,7 @@
       "notice_period_days": 30
     },
     "compensation": {
-      "base": 1200000,
+      "base": "Rupees 10 lakh per annum",
       "variable": {
         "percentage": 10,
         "frequency": "quarterly",
@@ -82,7 +82,7 @@
     },
     "joining_deferral": {
       "requested": true,
-      "new_date": "2025-09-16"
+      "new_date": "2025-09-18"
     },
     "visa_support": {
       "required": false,
@@ -93,5 +93,55 @@
     "status": "pending",
     "expected_days": "5-10",
     "remarks": "Starts after offer acceptance and document upload"
-  }
+  },
+  "negotiations": [
+    {
+      "request": "Wants to negotiate on CTC.",
+      "timestamp": "2025-09-08T09:00:43.231703Z"
+    },
+    {
+      "request": "Wants to negotiate on CTC.",
+      "timestamp": "2025-09-08T09:00:43.273918Z"
+    },
+    {
+      "request": "Request to reconsider and revisit base salary component.",
+      "timestamp": "2025-09-08T09:01:23.552105Z"
+    },
+    {
+      "request": "Request to reconsider and revisit base salary component.",
+      "timestamp": "2025-09-08T09:01:23.587831Z"
+    },
+    {
+      "request": "The candidate would like to negotiate on salary.",
+      "timestamp": "2025-09-08T18:14:07.534337Z"
+    },
+    {
+      "request": "The candidate would like to negotiate on salary.",
+      "timestamp": "2025-09-08T18:14:07.592082Z"
+    },
+    {
+      "request": "Negotiate on salary",
+      "timestamp": "2025-09-08T18:14:19.487761Z"
+    },
+    {
+      "request": "Negotiate on salary",
+      "timestamp": "2025-09-08T18:14:19.529849Z"
+    },
+    {
+      "request": "Requesting higher salary because he believes he deserves more and has reduced costs at his previous company.",
+      "timestamp": "2025-09-08T18:29:07.119451Z"
+    },
+    {
+      "request": "Requesting higher salary because he believes he deserves more and has reduced costs at his previous company.",
+      "timestamp": "2025-09-08T18:29:07.149776Z"
+    },
+    {
+      "request": "Candidate wishes to negotiate for a higher compensation based on market standards, their unique skill set, and the potential impact they can bring to the company.",
+      "timestamp": "2025-09-08T18:32:18.097417Z"
+    },
+    {
+      "request": "Candidate wishes to negotiate for a higher compensation based on market standards, their unique skill set, and the potential impact they can bring to the company.",
+      "timestamp": "2025-09-08T18:32:18.129924Z"
+    }
+  ]
 }
