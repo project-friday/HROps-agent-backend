@@ -139,15 +139,31 @@ def _suggest_alternatives(base_dt: datetime, tz_name: str, count: int = 2) -> li
 @function_tool(description="""
 Return the upcoming interview for an application, if any (scheduled or rescheduled in the future).
 Use after the user has selected which application to manage.
+Returns:
+        dict: A dictionary with the following fields:
+
+        If an upcoming interview exists:
+            {
+                "has_interview": True,
+                "status": str,               # "scheduled" or "rescheduled"
+                "scheduled_at": str,         # ISO8601 timestamp in UTC
+                "timezone": str,             # Interview timezone (default: "Asia/Kolkata")
+                "mode": str,                 # e.g., "video", "in-person"
+                "location_or_link": str,     # Meeting link or physical location
+                "interviewer": str,          # Interviewer's name
+                "application_id": str
+            }
+
+        If no upcoming interview exists:
+            {
+                "has_interview": False,
+                "interview": {},             # Always an empty dict
+                "application_id": str
+            }
 """)
 async def get_upcoming_interview(application_id: str) -> dict:
     """
-    Returns:
-      {
-        "has_interview": bool,
-        "interview": { ... } | {},
-        "application_id": str
-      }
+
     """
     rec, fp = _load_record_by_application_id(application_id)
     if not rec:
@@ -162,15 +178,14 @@ async def get_upcoming_interview(application_id: str) -> dict:
     if status in {"scheduled", "rescheduled"} and scheduled_at and scheduled_at > _now_utc():
         return {
             "has_interview": True,
-            "interview": {
-                "status": status,
-                "scheduled_at": _dt_to_iso(scheduled_at),
-                "timezone": itv.get("timezone") or "Asia/Kolkata",
-                "mode": itv.get("mode") or "video",
-                "location_or_link": itv.get("location_or_link") or "",
-                "interviewer": itv.get("interviewer") or "",
-            },
             "application_id": application_id,
+            "status": status,
+            "scheduled_at": _dt_to_iso(scheduled_at),
+            "timezone": itv.get("timezone") or "Asia/Kolkata",
+            "mode": itv.get("mode") or "video",
+            "location_or_link": itv.get("location_or_link") or "",
+            "interviewer": itv.get("interviewer") or "",
+            
         }
 
     return {"has_interview": False, "interview": {}, "application_id": application_id}
@@ -266,16 +281,35 @@ Reschedule the interview for an application to a new time.
 - If the user requests any other time, respond that the panel will not be available and suggest the allowed slots instead.
 - On success: updates JSON in place and returns the updated interview.
 - On failure: returns ok=false with 'reason' and optional 'suggested' alternatives.
+Returns:
+        dict: A dictionary with different structures depending on success or failure.
+
+        On success:
+            {
+                "reschedule_args": {
+                    "ok": True,
+                    "reason": None,
+                    "suggested": None
+                },
+                "status": str,               # "rescheduled"
+                "scheduled_at": str,         # ISO8601 timestamp in UTC
+                "timezone": str,             # Interview timezone (default: "Asia/Kolkata")
+                "mode": str,                 # e.g., "video", "in-person"
+                "location_or_link": str,     # Meeting link or physical location
+                "interviewer": str           # Interviewer's name
+            }
+
+        On failure:
+            {
+                "ok": False,
+                "reason": str,               # Reason code (e.g., "not_found", "invalid_time", "outside_business_hours")
+                "suggested": [str] | None,   # Suggested alternative ISO times if available
+                "interview": {}              # Always empty dict
+            }
 """)
 async def reschedule_interview(application_id: str, new_time_iso: str, reason: str = "candidate_request") -> dict:
     """
-    Returns:
-      {
-        "ok": bool,
-        "reason": str | null,
-        "suggested": [iso, ...] | null,
-        "interview": { ... } | {}
-      }
+
     """
     rec, fp = _load_record_by_application_id(application_id)
     if not rec:
@@ -326,17 +360,17 @@ async def reschedule_interview(application_id: str, new_time_iso: str, reason: s
         return {"ok": False, "reason": f"write_failed: {e}", "suggested": None, "interview": {}}
 
     return {
-        "ok": True,
-        "reason": None,
-        "suggested": None,
-        "interview": {
-            "status": itv["status"],
-            "scheduled_at": itv["scheduled_at"],
-            "timezone": tz_name,
-            "mode": itv.get("mode") or "video",
-            "location_or_link": itv.get("location_or_link") or "",
-            "interviewer": itv.get("interviewer") or "",
-        },
+   
+        "reschedule_args":
+            {"ok": True,
+            "reason": None,
+            "suggested": None,},
+        "status": itv["status"],
+        "scheduled_at": itv["scheduled_at"],
+        "timezone": tz_name,
+        "mode": itv.get("mode") or "video",
+        "location_or_link": itv.get("location_or_link") or "",
+        "interviewer": itv.get("interviewer") or "",
     }
 
 
@@ -344,31 +378,22 @@ async def reschedule_interview(application_id: str, new_time_iso: str, reason: s
     description="""
     Return all applications for a given email (case-insensitive).
     Matches files named: <application_id>_<normalized_email>.json in data/applications.
-
-    Output:
-    {
-      "email": "<input email>",
-      "name": "<first found full name or null>",
-      "count": <int>,
-      "applications": [
+        Returns:
+        dict with:
         {
-          "application_id": "<id>",
-          "job_title": "<title>",
-          "status": "<submitted|in_review|interview_scheduled|selected|rejected>",
-          "human_status": "<friendly sentence>",
-          "updated_at": "<ISO8601>",
-          "updated_at_human": "dd-mm-YYYY"
+            "email": str,             # Input email
+            "name": str | None,       # First found full name or null
+            "count": int,             # Number of applications
+            "applications": [         # List of applications
+                {
+                    "application_id": str,
+                    "job_title": str
+                }
+            ]
         }
-      ]
-    }
     """
 )
 async def list_applications_by_email(email: str) -> dict:
-    """
-    This doubles as the 'login fetch':
-    - normalizes email per filename
-    - returns a user-facing summary for 1-or-many apps
-    """
     apps: List[Dict[str, Any]] = []
     inferred_name: Optional[str] = None
 
@@ -407,10 +432,6 @@ async def list_applications_by_email(email: str) -> dict:
             apps.append({
                 "application_id": rec.get("application_id"),
                 "job_title": job_title,
-                "status": status,
-                "human_status": human,
-                "updated_at": updated_at,
-                "updated_at_human": updated_at_human,
             })
 
     return {
@@ -426,22 +447,27 @@ async def list_applications_by_email(email: str) -> dict:
     It looks for file: <application_id>_*.json in data/applications.
 
     Returns:
-    {
-      "found": true|false,
-      "application": {
-        "application_id": "...",
-        "job_title": "...",
-        "status": "submitted|in_review|interview_scheduled|selected|rejected",
-        "human_status": "...",
-        "updated_at": "YYYY-MM-DDTHH:MM:SSZ",
-        "updated_at_human": "dd-mm-YYYY",
-        "name": "Full Name or null",
-        "email": "raw email",
-        "phone": "raw phone or null",
-        "response_timeframe": "natural text or null",
-        "reschedules": "list of reschedule records or null"
+    - If found:
+      {
+        "found": true,
+        "application_id": str,
+        "job_title": str,
+        "status": str,              # "submitted" | "in_review" | "interview_scheduled" | "selected" | "rejected"
+        "human_status": str,        # Friendly sentence
+        "updated_at": str | null,   # ISO8601 timestamp
+        "updated_at_human": str,    # dd-mm-YYYY
+        "name": str | null,
+        "email": str | null,
+        "phone": str | null,
+        "response_timeframe": str | null,
+        "reschedules": list | null
       }
-    }
+
+    - If not found:
+      {
+        "found": false,
+        "application": null
+      }
     """
 )
 async def check_application_status(application_id: str) -> dict:
@@ -483,19 +509,18 @@ async def check_application_status(application_id: str) -> dict:
 
     return {
         "found": True,
-        "application": {
-            "application_id": rec.get("application_id"),
-            "job_title": job_title,
-            "status": status,
-            "human_status": human,
-            "updated_at": updated_at,
-            "updated_at_human": updated_at_human,
-            "name": rec.get("name"),
-            "email": rec.get("email"),
-            "phone": rec.get("phone"),
-            "response_timeframe": rec.get("response_timeframe"),
-            "reschedules": rec.get("reschedules"),
-        }
+        "application_id": rec.get("application_id"),
+        "job_title": job_title,
+        "status": status,
+        "human_status": human,
+        "updated_at": updated_at,
+        "updated_at_human": updated_at_human,
+        "name": rec.get("name"),
+        "email": rec.get("email"),
+        "phone": rec.get("phone"),
+        "response_timeframe": rec.get("response_timeframe"),
+        "reschedules": rec.get("reschedules"),
+        
     }
 
 
