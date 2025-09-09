@@ -215,16 +215,53 @@ class JobApplicationAgent(Agent):
 
         # Map action names to functions (used in websocket messages)
         self.actions = {
-            "listing applications": list_applications_by_email,
-            "check application status": check_application_status,
+            "Fetching Applications": list_applications_by_email,
+            "Selecting Application": select_application_by_choice,
+            "Checking Application Status": check_application_status,
+            "Querying Knowledge Base": query_knowledge_base,
+            "Fetching Interview Details": get_upcoming_interview,
+            "Checking Interview Availability": check_interview_availability,
+            "Rescheduling Interview": reschedule_interview,
+            "Processing Request": handover_to_onboarding,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
+        self.tool_result_filters = {
+            list_applications_by_email: ["email"],
+            check_application_status: ["email", "phone","human_status","updated_at_human","reschedules","found"],
+            get_upcoming_interview: ["has_interview","application_id"],
+            reschedule_interview: ["reschedule_args"],
+        }
 
-    async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None):
-        """Send WebSocket message with action and optional result"""
+        # 🎴 Card mapping for frontend
+        self.tool_cards = {
+            list_applications_by_email: "applications_list",
+            check_application_status: "application_status",
+            get_upcoming_interview: "upcoming_interview",
+            reschedule_interview: "interview_reschedule",
+            query_knowledge_base: "knowledge_base",
+            check_interview_availability: "interview_availability",
+            select_application_by_choice: "application_selection",
+            handover_to_onboarding: "handover",
+        }
+
+        self.visible_tools = {
+            list_applications_by_email,
+            check_application_status,
+            get_upcoming_interview,
+            reschedule_interview,
+        }
+
+    async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None, tool_func=None):
+        """Send WebSocket message with action, filtered result, and card_name."""
         message = {"action": action}
+
         if result is not None:
+            if tool_func in self.tool_result_filters:
+                for key in self.tool_result_filters[tool_func]:
+                    result.pop(key, None)
+
             message["result"] = result
+            message["card_name"] = self.tool_cards.get(tool_func, "generic")
 
         try:
             await self.room.local_participant.send_text(
@@ -284,41 +321,45 @@ class JobApplicationAgent(Agent):
                                     print(f"⚠️ Invalid JSON for {tool_name}: {tool_args}")
                                     tool_args = {}
 
-                            # tool_function = None
-                            # action_name = None
-                            # for name, func in self.actions.items():
-                            #     if func.__name__ == tool_name:
-                            #         tool_function = func
-                            #         action_name = name
-                            #         break
+                            tool_function = None
+                            action_name = None
+                            for name, func in self.actions.items():
+                                if func.__name__ == tool_name:
+                                    tool_function = func
+                                    action_name = name
+                                    break
 
-                            # if tool_function and action_name:
-                            #     # Send "action started"
-                            #     # await self._send_websocket_message(action_name)
+                            if tool_function and action_name:
+                                # Send "action started"
+                                await self._send_websocket_message(action_name)
 
-                            #     # Queue tool execution after LLM finishes
-                            #     pending_tools.append((action_name, tool_function, tool_args))
+                                # Queue tool execution after LLM finishes
+                                pending_tools.append((action_name, tool_function, tool_args))
 
                 yield chunk
 
         # Capture final LLM response
         self.last_llm_response = "".join(buffer).strip()
-        # print("✅ Full LLM response captured:", self.last_llm_response)
+        print("✅ Full LLM response captured:", self.last_llm_response)
 
         # Execute queued tools and send results
-        # for action_name, tool_function, tool_args in pending_tools:
-        #     try:
-        #         if asyncio.iscoroutinefunction(tool_function):
-        #             result = await tool_function(**tool_args)
-        #         else:
-        #             result = tool_function(**tool_args)
+        for action_name, tool_function, tool_args in pending_tools:
+            if tool_function not in self.visible_tools:
+                print(f"🚫 Skipping execution of {action_name} (not visible)")
+                continue
 
-        #         await self._send_websocket_message(action_name, result)
-        #         print(f"✅ Sent result for {action_name}: {result}")
+            try:
+                if asyncio.iscoroutinefunction(tool_function):
+                    result = await tool_function(**tool_args)
+                else:
+                    result = tool_function(**tool_args)
 
-        #     except Exception as e:
-        #         await self._send_websocket_message(action_name, {"error": str(e)})
-        #         print(f"❌ Tool execution failed for {action_name}: {e}")
+                await self._send_websocket_message(action_name, result, tool_func=tool_function)
+                print(f"✅ Sent result for {action_name}: {result}")
+
+            except Exception as e:
+                await self._send_websocket_message(action_name, {"error": str(e)}, tool_func=tool_function)
+                print(f"❌ Tool execution failed for {action_name}: {e}")
 
     # --- speaks immediately after the agent becomes active (e.g., after handover) ---
     async def on_enter(self):
