@@ -311,20 +311,20 @@ class OnboardingAgent(Agent):
                                     print(f"⚠️ Invalid JSON for {tool_name}: {tool_args}")
                                     tool_args = {}
 
-                            tool_function = None
-                            action_name = None
-                            for name, func in self.actions.items():
-                                if func.__name__ == tool_name:
-                                    tool_function = func
-                                    action_name = name
-                                    break
+                            # tool_function = None
+                            # action_name = None
+                            # for name, func in self.actions.items():
+                            #     if func.__name__ == tool_name:
+                            #         tool_function = func
+                            #         action_name = name
+                            #         break
 
-                            if tool_function and action_name:
-                                # Send "action started"
-                                await self._send_websocket_message(action_name)
+                            # if tool_function and action_name:
+                            #     # Send "action started"
+                            #     await self._send_websocket_message(action_name)
 
-                                # Queue for execution after LLM completes
-                                pending_tools.append((action_name, tool_function, tool_args))
+                            #     # Queue for execution after LLM completes
+                            #     pending_tools.append((action_name, tool_function, tool_args))
 
                 yield chunk
 
@@ -333,19 +333,19 @@ class OnboardingAgent(Agent):
         # print("✅ Full LLM response captured:", self.last_llm_response)
 
         # Now execute queued tools and send results
-        for action_name, tool_function, tool_args in pending_tools:
-            try:
-                if asyncio.iscoroutinefunction(tool_function):
-                    result = await tool_function(**(tool_args or {}))
-                else:
-                    result = tool_function(**(tool_args or {}))
+        # for action_name, tool_function, tool_args in pending_tools:
+        #     try:
+        #         if asyncio.iscoroutinefunction(tool_function):
+        #             result = await tool_function(**(tool_args or {}))
+        #         else:
+        #             result = tool_function(**(tool_args or {}))
 
-                await self._send_websocket_message(action_name, result)
-                # print(f"✅ Sent result for {action_name}: {result}")
+        #         await self._send_websocket_message(action_name, result)
+        #         # print(f"✅ Sent result for {action_name}: {result}")
 
-            except Exception as e:
-                await self._send_websocket_message(action_name, {"error": str(e)})
-                print(f"❌ Tool execution failed for {action_name}: {e}")
+        #     except Exception as e:
+        #         await self._send_websocket_message(action_name, {"error": str(e)})
+        #         print(f"❌ Tool execution failed for {action_name}: {e}")
 
 
     async def on_enter(self):
