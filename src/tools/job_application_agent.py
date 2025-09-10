@@ -9,7 +9,11 @@ from zoneinfo import ZoneInfo
 from livekit.agents import RunContext
 # from src.agents.onboarding import OnboardingAgent
 from livekit.agents import function_tool  # decorator used by the agent to call tools
+from src.utils.emails import send_email  # SES email sender
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # ---------- Constants & Helpers ----------
 
 APPS_DIR = Path("data/applications")
@@ -735,4 +739,87 @@ async def query_knowledge_base(question: str, top_k: int = 4) -> dict:
     return {
         "answer": stitched,
         "snippets": snippets
+    }
+
+
+
+@function_tool(
+    description="""
+    Send a summary email of a conversation to the candidate.
+    The summary text must be provided by the calling agent.
+    This function always sends the email to the candidate.
+    """
+)
+async def email_conversation_summary(name: str, email: str, conversation_summary: str, send: bool = True) -> dict:
+    subject = f"Conversation Summary – {name}"
+    body = f"""
+Hi {name},
+
+Here’s a summary of our recent conversation:
+
+{conversation_summary}
+
+Best regards,  
+Team
+"""
+
+    if send:
+        try:
+            send_email(email, subject, body)
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to send conversation summary to {email}.",
+                "error": str(e),
+            }
+
+    return {
+        "success": True,
+        "message": f"✅ I've sent the conversation summary to {email}. Please check your inbox for '{subject}'.",
+        "status": f"Summary sent to {email}"
+    }
+
+
+
+@function_tool(
+    description="""
+    Escalate to the hiring team by sending them an email.
+    Use this when the candidate requests something outside the agent's scope,
+    or explicitly asks to be connected with a human/hiring team.
+    """
+)
+async def escalate_to_hiring_team(name: str, email: str, request: str, send: bool = True) -> dict:
+    hiring_team_email = os.getenv("ONBOARDING_TEAM_EMAIL")
+    subject = f"Escalation Required: Candidate {name}"
+    body = f"""
+The candidate {name} ({email}) has a request that requires human intervention.
+
+Request details:
+{request}
+
+Timestamp: {datetime.utcnow().isoformat()}Z
+
+Please review and follow up with the candidate directly.
+"""
+
+    if send and hiring_team_email:
+        try:
+            send_email(hiring_team_email, subject, body)
+        except Exception as e:
+            return {
+                "success": False,
+                "message": "Escalation request captured, but failed to notify the hiring team.",
+                "error": str(e),
+            }
+    elif send and not hiring_team_email:
+        return {
+            "success": False,
+            "message": "Escalation request captured, but no hiring team email is configured.",
+        }
+
+    return {
+        "success": True,
+        "message": "✅ I've shared your request with the hiring team. They’ll follow up with you soon.",
+        "status":"email sent to hiring team"
+
     }
