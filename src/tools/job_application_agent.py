@@ -401,6 +401,7 @@ async def list_applications_by_email(email: str) -> dict:
     apps: List[Dict[str, Any]] = []
     inferred_name: Optional[str] = None
 
+    # email = normalize_email(email) or (email or "").strip().lower()
     email_norm = _normalize_email_for_filename(email)
 
     if APPS_DIR.exists():
@@ -552,6 +553,7 @@ async def check_application_status(application_id: str) -> dict:
     """
 )
 async def select_application_by_choice(email: str, choice: str) -> dict:
+    # email = normalize_email(email) or (email or "").strip().lower()
     email_norm = _normalize_email_for_filename(email)
     files = sorted(
         APPS_DIR.glob(f"*_{email_norm}.json"),
