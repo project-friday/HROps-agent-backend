@@ -92,15 +92,19 @@ class OnboardingAgent(Agent):
         # Mapping of actions to tool functions
         self.actions = {
             "checking offer status": check_offer_status,
+            "fetching offer summary": get_offer_summary,
             "getting info": get_documents_checklist,
-            "getting offer": get_offer_details,
+            "fetching offer details": get_offer_details,
             "getting manager details": get_reporting_manager,
             "sending summary mail": send_onboarding_summary,
+            "sending checklist on email":email_documents_checklist,
             "getting orientation details": get_day1_agenda,
             "getting work location details":get_work_location,
             "getting assest info": get_it_assets,
             "getting bgv status": get_background_verification_status,
-            "logging negotiation": log_negotiation
+            "logging negotiation": log_negotiation,
+            "notifying onboarding team": escalate_to_onboarding_team,
+            "submitting deferral request": mark_deferral
 
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
