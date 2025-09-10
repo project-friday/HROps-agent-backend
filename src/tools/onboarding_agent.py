@@ -4,6 +4,11 @@ from typing import Dict, Any, Optional, List
 from livekit.agents import function_tool
 from pathlib import Path
 from livekit.agents import RunContext
+from src.utils.emails import send_email
+import os 
+from dotenv import load_dotenv
+
+load_dotenv()
 # from src.agents.job_application import JobApplicationAgent
 
 
@@ -121,16 +126,21 @@ async def get_background_verification_status(name: str, email: str) -> dict:
 
 
 
+ # your SES email sender
+
+
 @function_tool(
     description="""
     Mark candidate’s joining deferral request with a new date.
+    This will also notify the hiring team about the deferral request.
     """
 )
-async def mark_deferral(name: str, email: str, new_date: str) -> dict:
+async def mark_deferral(name: str, email: str, new_date: str, send: bool = True) -> dict:
     """
     new_date: must be in format YYYY-MM-DD
+    ⚠️ Always call with `send=True` to actually notify the hiring team.
     """
-    fn = _normalize_for_filename(name=name,email=email)
+    fn = _normalize_for_filename(name=name, email=email)
     fp = OFFERS_DIR / fn
 
     if not fp.exists():
@@ -140,11 +150,38 @@ async def mark_deferral(name: str, email: str, new_date: str) -> dict:
     data.setdefault("escalations", {})
     data["escalations"]["joining_deferral"] = {
         "requested": True,
-        "new_date": new_date
+        "new_date": new_date,
     }
 
     fp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return {"success": True, "joining_deferral": new_date}
+
+    # Hiring team email
+    hiring_subject = f"Deferral Request: {name}"
+    hiring_body = (
+        f"The candidate {name} ({email}) has requested to defer their joining date.\n\n"
+        f"New requested date: {new_date}\n\n"
+        "Please review and update the onboarding process accordingly."
+    )
+    hiring_team_email = os.getenv("ONBOARDING_TEAM_EMAIL")
+
+    if send and hiring_team_email:
+        try:
+            send_email(hiring_team_email, hiring_subject, hiring_body)
+        except Exception as e:
+            return {
+                "success": True,
+                "message": "Deferral request submitted, but failed to notify hiring team.",
+                "warning": str(e),
+            }
+
+    elif send and not hiring_team_email:
+        return {
+            "success": True,
+            "message": "Deferral request submitted, but no hiring team email is configured.",
+        }
+
+    return {"success": True, "status": "Deferral request submitted"}
+
 
 @function_tool(
     description="""
@@ -226,44 +263,65 @@ async def get_offer_details(name: str, email: str) -> dict:
     
     return result
 
+
+
 @function_tool(
     description="""
     Log a negotiation request from the candidate.
-    It appends the request into the 'negotiations' key inside their JSON record.
-    If 'negotiations' does not exist, it creates a list.
-    Returns a friendly confirmation message (not the raw JSON).
+    This no longer stores the request in JSON, but directly notifies
+    the compensation team via email.
+    Returns a friendly confirmation message (not raw email details).
     """
 )
-async def log_negotiation(name: str, email: str, request: str) -> dict:
-    rec = _load_candidate_record(name, email)
-    if not rec:
-        return {"error": "No record found"}
+async def log_negotiation(name: str, email: str, request: str, send: bool = True) -> dict:
+    comp_team_email = os.getenv("ONBOARDING_TEAM_EMAIL")
+    print("email:",comp_team_email)
+    subject = f"Negotiation Request: {name}"
+    body = (
+        f"The candidate {name} ({email}) has submitted a negotiation request.\n\n"
+        f"Request details:\n{request}\n\n"
+        f"Timestamp: {datetime.utcnow().isoformat()}Z\n\n"
+        "Please review this request and follow up as appropriate."
+    )
 
-    # Ensure negotiations list exists
-    if "negotiations" not in rec:
-        rec["negotiations"] = []
+    if send and comp_team_email:
+        try:
+            send_email(comp_team_email, subject, body)
+            # print(response)
+        except Exception as e:
+            print("error sending email")
+            return {
+                "success": True,
+                "message": "Negotiation request submitted, but failed to notify the compensation team.",
+                "warning": str(e),
+            }
 
-    rec["negotiations"].append({
-        "request": request,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
-    })
-
-    # Save back to file
-    fn = _normalize_for_filename(name, email)
-    fp = OFFERS_DIR / fn
-    fp.write_text(json.dumps(rec, indent=2), encoding="utf-8")
+    elif send and not comp_team_email:
+        print("comp email not found")
+        return {
+            "success": True,
+            "message": "Negotiation request submitted, but no compensation team email is configured.",
+        }
 
     return {
-        "message": "Your request for negotiation has been shared with the compensation team, thank you."
+        "success": True,
+        "message": "Your request for negotiation has been shared with the onboarding team, thank you.",
+        "status":"email sent to compensation team"
     }
+
+
+
 
 @function_tool(
     description="""
     Email the candidate their required document checklist.
     This will send a secure email to the candidate’s registered email address with the list of documents.
+
+    Always call this function with `send=True` to actually send the email.
+
     """
 )
-async def email_documents_checklist(name: str, email: str) -> dict:
+async def email_documents_checklist(name: str, email: str, send: bool = True) -> dict:
     rec = _load_candidate_record(name, email)
     if not rec:
         return {"error": "No record found"}
@@ -272,40 +330,69 @@ async def email_documents_checklist(name: str, email: str) -> dict:
     if not documents:
         return {"error": "No documents checklist found for this candidate"}
 
-    # Simulate sending email (replace this with actual email service later)
-    print(f"Sending documents checklist to {email}:\n- " + "\n- ".join(documents))
+    # Build plain text email body
+    subject = "Your Preboarding Document Checklist"
+    body = (
+        f"Hello {name},\n\n"
+        "Here is your preboarding document checklist:\n\n"
+        + "\n".join(f"- {doc}" for doc in documents)
+        + "\n\nPlease make sure to have these ready.\n\n"
+        "Best regards,\n"
+        "The HR Team"
+    )
 
-    return {
-        "message": f"✅ I’ve just sent the document checklist to {email}. Please check your inbox (and spam folder just in case)."
-    }
+    if send:
+        try:
+            send_email(email, subject, body)  # use SES function
+            return {
+                "message": f"✅ I’ve just sent the document checklist to {email}. Please check your inbox (and spam folder just in case)."
+            }
+        except Exception as e:
+            return {"error": f"Failed to send email: {str(e)}"}
+    else:
+        # Simulated mode
+        return {
+            "status": f"Sent checklist to {email}"
+        }
+
 
 @function_tool(
     description="""
     Send a summary email of the current onboarding conversation to the candidate.
     The summary text must be provided by the calling agent (not fetched from JSON).
+    The email will always be sent to the candidate.
     """
 )
-async def send_onboarding_summary(name: str, email: str, conversation_summary: str) -> dict:
+async def send_onboarding_summary(name: str, email: str, conversation_summary: str, send: bool = True) -> dict:
     subject = f"Onboarding Plan – {name}"
-    email_body = f"""
-    Hi {name},
+    body = f"""
+Hi {name},
 
-    Here's a quick recap of our conversation today:
+Here's a quick recap of our conversation today:
 
-    {conversation_summary}
+{conversation_summary}
 
-    Excited to have you onboard! 🎉
+Excited to have you onboard! 🎉
 
-    Regards,  
-    HR Team
-    """
+Regards,  
+HR Team
+"""
 
-    print(f"Sending onboarding summary to {email}:\nSubject: {subject}\n\n{email_body}")
-    result = {
-        "message": f"✅ I've sent the conversation summary to {email}. Please check your inbox for '{subject}'"
+    if send:
+        try:
+            send_email(email, subject, body)
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to send onboarding summary to {email}.",
+                "error": str(e),
+            }
+
+    return {
+        "success": True,
+        "message": f"✅ I've sent the conversation summary to {email}. Please check your inbox for '{subject}'",
+        "status": f"Summary sent to {email}"
     }
-    
-    return result
 
 @function_tool(
     description="""
@@ -370,11 +457,49 @@ async def get_work_location(name: str, email: str) -> dict:
         "work_model": work_model
     }
 
-#______________________________________________________________________________________________________________#
-#--------------------------------------------------------------------------------------------------------------#
-#______________________________________________________________________________________________________________#
 
 
-#______________________________________________________________________________________________________________#
-#--------------------------------------------------------------------------------------------------------------#
-#______________________________________________________________________________________________________________#
+
+@function_tool(
+    description="""
+    Escalate to the onboarding team by sending them an email.
+    Use this when the candidate raises an onboarding-related request
+    that the agent cannot handle directly, or when human support is required.
+    """
+)
+async def escalate_to_onboarding_team(name: str, email: str, request: str, send: bool = True) -> dict:
+    onboarding_team_email = os.getenv("ONBOARDING_TEAM_EMAIL")
+    print("onboarding email:",onboarding_team_email)
+    subject = f"Escalation Required: Onboarding Support for {name}"
+    body = f"""
+The candidate {name} ({email}) has raised a request that requires onboarding team intervention.
+
+Request details:
+{request}
+
+Timestamp: {datetime.utcnow().isoformat()}Z
+
+Please review this request and follow up with the candidate.
+"""
+
+    if send and onboarding_team_email:
+        try:
+            response= send_email(onboarding_team_email, subject, body)
+            print(response)
+        except Exception as e:
+            return {
+                "success": False,
+                "message": "Escalation request captured, but failed to notify the onboarding team.",
+                "error": str(e),
+            }
+    elif send and not onboarding_team_email:
+        return {
+            "success": False,
+            "message": "Escalation request captured, but no onboarding team email is configured.",
+        }
+
+    return {
+        "success": True,
+        "message": "✅ I've shared your request with the onboarding team. They’ll follow up with you soon.",
+        "status":"email sent to onboarding team"
+    }
