@@ -36,9 +36,7 @@ if not os.getenv("OPENAI_API_KEY"):
 
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
-    session=AgentSession[CandidateData](
-        userdata=CandidateData(),
-    )
+    session=AgentSession()
     # attach disconnect handler
     # @ctx.room.on("participant_disconnected")
     # async def _on_disconnected(_):

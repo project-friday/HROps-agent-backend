@@ -1,7 +1,7 @@
 {
   "candidate": {
-    "name": "John",
-    "email": "John@gmail.com",
+    "name": "samyak",
+    "email": "samyak@renan.one",
     "application_id": "APP12345",
     "role": "Data Engineer",
     "level": "L2",
@@ -142,6 +142,14 @@
     {
       "request": "Candidate wishes to negotiate for a higher compensation based on market standards, their unique skill set, and the potential impact they can bring to the company.",
       "timestamp": "2025-09-08T18:32:18.129924Z"
+    },
+    {
+      "request": "Wants to negotiate for higher CTC based on market standards and individual skill set.",
+      "timestamp": "2025-09-10T13:40:42.048281Z"
+    },
+    {
+      "request": "Wants to negotiate for higher CTC based on market standards and individual skill set.",
+      "timestamp": "2025-09-10T13:40:42.074366Z"
     }
   ]
 }

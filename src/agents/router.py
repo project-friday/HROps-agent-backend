@@ -4,6 +4,7 @@ from livekit import rtc
 from src.agents.job_application import JobApplicationAgent
 from src.agents.onboarding import OnboardingAgent
 from livekit.plugins import assemblyai, elevenlabs,openai, silero
+from src.utils.stt_config import make_deepgram_stt
 
 
 ROUTER_INSTRUCTIONS = """
@@ -77,13 +78,20 @@ class RouterAgent(Agent):
     def __init__(self,room:rtc.Room):
         self.room=room
         super().__init__(instructions=ROUTER_INSTRUCTIONS,
-                         stt=assemblyai.STT(),
+                        #  stt=assemblyai.STT(),
+                        stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
+                        # stt=openai.STT(
+                        #    model="gpt-4o-transcribe",
+                        #    language="en",          # force English
+                        #    detect_language=False   # disable auto language detection
+                        # ),
                         llm=openai.LLM(model="gpt-4.1"),
                         vad=silero.VAD.load(),
                          tts=elevenlabs.TTS(
                 # voice_id="wlmwDR77ptH6bKHZui0l",
                 voice_id="H8bdWZHK2OgZwTN7ponr",
-                model="eleven_multilingual_v2",
+                # model="eleven_multilingual_v2",
+                model="eleven_turbo_v2_5",
             )
 
                          )

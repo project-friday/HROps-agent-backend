@@ -33,6 +33,8 @@ from src.tools.onboarding_agent import (
 
 )
 from dotenv import load_dotenv  
+from src.utils.stt_config import make_deepgram_stt
+
 load_dotenv()
 
 
@@ -47,12 +49,20 @@ class OnboardingAgent(Agent):
         # print("room:", self.room)
         super().__init__(
         instructions=ONBOARDING_PROMPT,
-        stt=assemblyai.STT(),
+        # stt=assemblyai.STT(),
+        stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
+        # stt = openai.STT(model="gpt-4o-transcribe"),
+        # stt=openai.STT(
+        #     model="gpt-4o-transcribe",
+        #     language="en",          # force English
+        #     detect_language=False   # disable auto language detection
+        # ),
         # tts=openai.TTS(model="gpt-4o-mini-tts", voice="shimmer"),
         tts=elevenlabs.TTS(
                 # voice_id="wlmwDR77ptH6bKHZui0l",
                 voice_id="H8bdWZHK2OgZwTN7ponr",
-                model="eleven_multilingual_v2",
+                # model="eleven_multilingual_v2",
+                model="eleven_turbo_v2_5",
             ),
         llm=openai.LLM(model="gpt-4.1"),
         vad=silero.VAD.load(),

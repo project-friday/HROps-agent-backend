@@ -10,11 +10,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 # from src.agents.job_application import JobApplicationAgent
+# from src.utils.helpers import normalize_email
 
 
 OFFERS_DIR = Path("data/offers")
 
 def _normalize_for_filename(name: str, email: str) -> str:
+    # email = normalize_email(email) or (email or "").strip().lower()
     safe_name = re.sub(r'[^a-z0-9]+', '_', name.lower())
     safe_email = re.sub(r'[^a-z0-9@]+', '_', email.lower())
     print(safe_email)
