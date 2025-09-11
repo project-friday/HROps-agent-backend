@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import AsyncGenerator,Dict, Any
 import logging
 from livekit.agents.voice import Agent,ModelSettings
-from livekit.plugins import openai, silero, assemblyai
+from livekit.plugins import openai, silero, assemblyai, deepgram
 from livekit.plugins import elevenlabs
 from livekit.agents import llm
 import asyncio
@@ -55,23 +55,17 @@ class JobApplicationAgent(Agent):
         self.room=room
         super().__init__(
             instructions=EVE_SYSTEM_PROMPT,
-            # stt=assemblyai.STT(),
-            stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
-            # # stt = openai.STT(model="gpt-4o-transcribe"),
-            # stt=openai.STT(
-            #     model="gpt-4o-transcribe",
-            #     language="en",          # force English
-            #     detect_language=False   # disable auto language detection
-            # ),
-            llm=openai.LLM(model="gpt-4.1",temperature=0.1),
-            # tts=openai.TTS(model="gpt-4o-mini-tts", voice="shimmer"),
-            tts=elevenlabs.TTS(
-                # voice_id="wlmwDR77ptH6bKHZui0l",
-                voice_id="H8bdWZHK2OgZwTN7ponr",
-                # model="eleven_multilingual_v2",
-                model="eleven_turbo_v2_5",
-            ),
-            vad=silero.VAD.load(min_speech_duration=0.1),
+            stt=deepgram.STT(language='es'),
+                            llm=openai.LLM(model="gpt-4.1"),
+                            vad=silero.VAD.load(),
+                            tts=elevenlabs.TTS(
+                    # voice_id="wlmwDR77ptH6bKHZui0l",
+                    # voice_id="H8bdWZHK2OgZwTN7ponr",
+                    # voice_id="hHjbwzYZW17oh0p05AKv",
+                    voice_id="kjHz50TasdqbpbfK4uaN",
+                    model="eleven_turbo_v2_5",
+                    language='es'
+                ),
             chat_ctx=chat_ctx,
             tools=[
                 list_applications_by_email,

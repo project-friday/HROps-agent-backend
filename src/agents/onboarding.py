@@ -2,7 +2,7 @@ from cmath import log
 from livekit.agents import ChatContext
 from livekit import rtc
 from livekit.agents.voice import Agent,ModelSettings
-from livekit.plugins import openai, silero, assemblyai
+from livekit.plugins import openai, silero, assemblyai,deepgram
 from livekit.plugins import elevenlabs
 from livekit.agents import llm
 import asyncio
@@ -47,16 +47,20 @@ class OnboardingAgent(Agent):
     def __init__(self, room: rtc.Room, chat_ctx=None):
         self.room = room
         super().__init__(
-            instructions=ONBOARDING_PROMPT,
-            stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
-            tts=elevenlabs.TTS(
-                voice_id="H8bdWZHK2OgZwTN7ponr",
+        instructions=ONBOARDING_PROMPT,
+        stt=deepgram.STT(language='es'),
+                        llm=openai.LLM(model="gpt-4.1"),
+                        vad=silero.VAD.load(),
+                         tts=elevenlabs.TTS(
+                # voice_id="wlmwDR77ptH6bKHZui0l",
+                # voice_id="H8bdWZHK2OgZwTN7ponr",
+                # voice_id="hHjbwzYZW17oh0p05AKv",
+                voice_id="kjHz50TasdqbpbfK4uaN",
                 model="eleven_turbo_v2_5",
+                language='es'
             ),
-            llm=openai.LLM(model="gpt-4.1", temperature=0.1),
-            vad=silero.VAD.load(),
-            chat_ctx=chat_ctx,
-            tools=[
+        chat_ctx=chat_ctx,
+        tools=[
                 check_offer_status,
                 get_offer_summary,
                 confirm_joining_date,
