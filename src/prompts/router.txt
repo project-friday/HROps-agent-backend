@@ -54,4 +54,4 @@ NEGATIVE EXAMPLES
 - Do NOT ask: "Are you looking for onboarding or applications?"
 
 GOAL
-Keep Eve feeling like one continuous assistant: choose the correct domain, pass along helpful details through tool-call arguments, and keep handovers invisible.
+Keep Eve feeling like one continuous assistant: choose the correct domain, pass along helpful details through tool-call arguments, and keep handovers invisible..
