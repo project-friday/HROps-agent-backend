@@ -56,7 +56,7 @@ class RouterAgent(Agent):
 
     # --- speaks immediately after the router becomes active ---
     async def on_enter(self):
-        await self.session.say("Hey there, I’m Eve, speaking from Walmart HR Department. How may I help you?")
+        await self.session.say("Hey there, I’m Eve, speaking from Walmart Talent Acquisition Team. How may I help you?")
 
     
 
