@@ -1,0 +1,16 @@
+{
+  "application_id": "A-002",
+  "email": "diego.martinez@outlook.com",
+  "name": "Diego",
+  "phone": "+91 98xxxxxx12",
+  "job_id": "JR-202",
+  "job_title": "Data Scientist",
+  "status": "Pending",
+  "resume_reviewed": "Not yet",
+  "updated_at": "2025-09-02T09:10:00Z",
+  "response_timeframe": "2 weeks",
+  "description": "Your profile is currently under review. Once shortlisted, we will reach out to schedule your interview.",
+  "interview": {
+  },
+  "reschedules": [
+  ]}

@@ -1,0 +1,31 @@
+{
+  "candidate": {
+    "name": "Miguel",
+    "email": "miguel689@yahoo.com",
+    "application_id": "APP12346",
+    "role": "Backend Engineer",
+    "level": "L2",
+    "location": "Bangalore",
+    "work_model": "Hybrid (3 days onsite)"
+  },
+  "offer": {
+    "status": "preparing",
+    "eta_hours": 48,
+    "summary": {
+      "title": "Backend Engineer",
+      "level": "L2",
+      "base": "Rupees 12 lakh per annum",
+      "variable": "10%",
+      "benefits": ["Health insurance", "ESOPs"],
+      "location": "Bangalore",
+      "tentative_joining": "01 Oct 2025"
+    },
+    "clarifications": {
+      "compensation": "The variable is up to 10% of annual base, paid quarterly.",
+      "probation": "Yes—3 months, all benefits apply, notice is 30 days.",
+      "deadline": "Please accept the offer by 15 Sep 2025."
+    }
+  }
+}
+
+
