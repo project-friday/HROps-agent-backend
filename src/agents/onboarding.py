@@ -46,28 +46,17 @@ ONBOARDING_PROMPT =load_prompt("src/prompts/onboarding.txt")
 class OnboardingAgent(Agent):
     def __init__(self, room: rtc.Room, chat_ctx=None):
         self.room = room
-        # print("room:", self.room)
         super().__init__(
-        instructions=ONBOARDING_PROMPT,
-        # stt=assemblyai.STT(),
-        stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
-        # stt = openai.STT(model="gpt-4o-transcribe"),
-        # stt=openai.STT(
-        #     model="gpt-4o-transcribe",
-        #     language="en",          # force English
-        #     detect_language=False   # disable auto language detection
-        # ),
-        # tts=openai.TTS(model="gpt-4o-mini-tts", voice="shimmer"),
-        tts=elevenlabs.TTS(
-                # voice_id="wlmwDR77ptH6bKHZui0l",
+            instructions=ONBOARDING_PROMPT,
+            stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
+            tts=elevenlabs.TTS(
                 voice_id="H8bdWZHK2OgZwTN7ponr",
-                # model="eleven_multilingual_v2",
                 model="eleven_turbo_v2_5",
             ),
-        llm=openai.LLM(model="gpt-4.1",temperature=0.1),
-        vad=silero.VAD.load(),
-        chat_ctx=chat_ctx,
-        tools=[
+            llm=openai.LLM(model="gpt-4.1", temperature=0.1),
+            vad=silero.VAD.load(),
+            chat_ctx=chat_ctx,
+            tools=[
                 check_offer_status,
                 get_offer_summary,
                 confirm_joining_date,
@@ -86,54 +75,95 @@ class OnboardingAgent(Agent):
                 handover_to_applications,
                 get_background_verification_status,
                 log_negotiation,
-                escalate_to_onboarding_team
-            ],)
+                escalate_to_onboarding_team,
+            ],
+        )
 
-        # Mapping of actions to tool functions
+        # --- Action mapping for websocket updates ---
         self.actions = {
-            "checking offer status": check_offer_status,
-            "fetching offer summary": get_offer_summary,
-            "getting info": get_documents_checklist,
-            "fetching offer details": get_offer_details,
-            "getting manager details": get_reporting_manager,
-            "sending summary mail": send_onboarding_summary,
-            "sending checklist on email":email_documents_checklist,
-            "getting orientation details": get_day1_agenda,
-            "getting work location details":get_work_location,
-            "getting assest info": get_it_assets,
-            "getting bgv status": get_background_verification_status,
-            "logging negotiation": log_negotiation,
-            "notifying onboarding team": escalate_to_onboarding_team,
-            "submitting deferral request": mark_deferral
-
+            "Checking Offer Status": check_offer_status,
+            "Fetching Offer Summary": get_offer_summary,
+            "Getting Documents Checklist": get_documents_checklist,
+            "Fetching Offer Details": get_offer_details,
+            "Getting Manager Details": get_reporting_manager,
+            "Sending Summary Mail": send_onboarding_summary,
+            "Sending Checklist on Email": email_documents_checklist,
+            "Getting Day1 Agenda": get_day1_agenda,
+            "Getting Work Location": get_work_location,
+            "Getting IT Assets": get_it_assets,
+            "Getting Background Verification Status": get_background_verification_status,
+            "Logging Negotiation": log_negotiation,
+            "Notifying Onboarding Team": escalate_to_onboarding_team,
+            "Submitting Deferral Request": mark_deferral,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
-    async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None):
-        """Send WebSocket message with action and optional result"""
+        # --- Filters (hide internal/sensitive keys) ---
+        self.tool_result_filters = {
+            get_offer_details: ["status","loacation","payroll","benefits"],
+            get_offer_summary:["benefits"],
+            get_documents_checklist: ["internal_ref"],
+            log_negotiation: ["raw_email"],  # avoid exposing internals
+        }
+        self.email_tools = {
+                log_negotiation,
+                escalate_to_onboarding_team,
+                send_onboarding_summary,
+                mark_deferral,
+            }
+
+        # --- Card mapping for frontend UI ---
+        self.tool_cards = {
+            check_offer_status: "offer_status",
+            get_offer_summary: "offer_summary",
+            get_offer_details: "offer_details",
+            get_reporting_manager: "manager_details",
+            get_work_location: "work_location",
+            get_preboarding_tasks: "preboarding_tasks",
+            get_documents_checklist: "documents_checklist",
+            update_shipping_address: "shipping_address",
+            schedule_intro_call: "intro_call",
+            mark_deferral: "deferral",
+            email_documents_checklist: "documents_email",
+            send_onboarding_summary: "summary_email",
+            get_it_assets: "it_assets",
+            get_day1_agenda: "day1_agenda",
+            get_background_verification_status: "bgv_status",
+            log_negotiation: "negotiation",
+            escalate_to_onboarding_team: "escalation",
+        }
+
+        # --- Only some tools visible in UI ---
+        self.visible_tools = {
+            check_offer_status,
+            get_offer_summary,
+            get_offer_details,
+            get_reporting_manager,
+            get_work_location,
+            get_documents_checklist,
+            get_background_verification_status,
+        }
+
+    async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None, tool_func=None):
+        """Send WebSocket message with action, filtered result, and card_name."""
         message = {"action": action}
+
         if result is not None:
+            if tool_func in self.tool_result_filters:
+                for key in self.tool_result_filters[tool_func]:
+                    result.pop(key, None)
+
             message["result"] = result
+            message["card_name"] = self.tool_cards.get(tool_func, "generic")
 
         try:
             await self.room.local_participant.send_text(
                 json.dumps(message),
-                topic="lk.transcription"
+                topic="lk.transcription",
             )
-            # print(f"✅ Sent WebSocket message: {message}")
+            print(f"✅ Sent WebSocket message: {message}")
         except Exception as e:
             print(f"❌ Failed to send WebSocket message: {e}")
-
-    async def on_enter(self):
-        # candidate = self.chat_ctx.session.userdata.get("candidate", {})
-        # query = self.session.userdata.get("handover_query")
-
-        # name = candidate.get("name", "there")
-        # email = candidate.get("email", "unknown")
-
-        await self.session.generate_reply(
-            # instructions=( )
-        )
 
     async def llm_node(
         self,
@@ -141,8 +171,7 @@ class OnboardingAgent(Agent):
         tools: list[llm.FunctionTool | llm.RawFunctionTool],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[llm.ChatChunk | str, None]:
-        """Custom LLM node that captures full response text."""
-
+        """Custom LLM node that captures response and tool usage like JobApplicationAgent."""
         activity = self._get_activity_or_raise()
         assert activity.llm is not None, "llm_node called but no LLM node is available"
         assert isinstance(activity.llm, llm.LLM)
@@ -152,7 +181,7 @@ class OnboardingAgent(Agent):
         conn_options = activity.session.conn_options.llm_conn_options
 
         buffer: list[str] = []
-        pending_tools: list[tuple[str, callable, dict]] = []  # (action_name, tool_fn, tool_args)
+        pending_tools: list[tuple[str, callable, dict]] = []
 
         async with activity_llm.chat(
             chat_ctx=chat_ctx,
@@ -163,20 +192,19 @@ class OnboardingAgent(Agent):
             async for chunk in stream:
                 if isinstance(chunk, str):
                     buffer.append(chunk)
-                    # print("🤖 LLM str chunk:", chunk)
+                    print("🤖 LLM str chunk:", chunk)
 
                 elif isinstance(chunk, llm.ChatChunk):
                     if chunk.delta and chunk.delta.content:
                         buffer.append(chunk.delta.content)
 
                     if chunk.delta and chunk.delta.tool_calls:
-                        # print("🛠️ Tool calls:", chunk.delta.tool_calls)
-
+                        print("🛠️ Tool calls:", chunk.delta.tool_calls)
                         for tool_call in chunk.delta.tool_calls:
                             tool_name = tool_call.name
                             tool_args = tool_call.arguments or "{}"
 
-                            # 🔑 Always parse arguments safely
+                            # Parse args safely
                             if isinstance(tool_args, str):
                                 try:
                                     tool_args = json.loads(tool_args)
@@ -193,33 +221,38 @@ class OnboardingAgent(Agent):
                                     break
 
                             if tool_function and action_name:
-                                # Send "action started"
                                 await self._send_websocket_message(action_name)
-
-                                # Queue for execution after LLM completes
                                 pending_tools.append((action_name, tool_function, tool_args))
 
                 yield chunk
 
-        # Capture final LLM response
+        # Final LLM response
         self.last_llm_response = "".join(buffer).strip()
-        # print("✅ Full LLM response captured:", self.last_llm_response)
+        print("✅ Full LLM response captured:", self.last_llm_response)
 
-        # Now execute queued tools and send results
-        # for action_name, tool_function, tool_args in pending_tools:
-        #     try:
-        #         if asyncio.iscoroutinefunction(tool_function):
-        #             result = await tool_function(**(tool_args or {}))
-        #         else:
-        #             result = tool_function(**(tool_args or {}))
+        # Execute queued tools (only visible ones)
+        for action_name, tool_function, tool_args in pending_tools:
+            if tool_function not in self.visible_tools:
+                print(f"🚫 Skipping execution of {action_name} (not visible)")
 
-        #         await self._send_websocket_message(action_name, result)
-        #         # print(f"✅ Sent result for {action_name}: {result}")
+                continue
 
-        #     except Exception as e:
-        #         await self._send_websocket_message(action_name, {"error": str(e)})
-        #         print(f"❌ Tool execution failed for {action_name}: {e}")
+            if tool_function in self.email_tools:
+                tool_args["send"] = False
 
+            try:
+                if asyncio.iscoroutinefunction(tool_function):
+                    result = await tool_function(**tool_args)
+                else:
+                    result = tool_function(**tool_args)
+
+                await self._send_websocket_message(action_name, result, tool_func=tool_function)
+                print(f"✅ Sent result for {action_name}: {result}")
+
+            except Exception as e:
+                await self._send_websocket_message(action_name, {"error": str(e)}, tool_func=tool_function)
+                print(f"❌ Tool execution failed for {action_name}: {e}")
 
     async def on_enter(self):
-        self.session.generate_reply()
+        await self.session.generate_reply()
+
