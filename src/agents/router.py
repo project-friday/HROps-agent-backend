@@ -28,7 +28,7 @@ class RouterAgent(Agent):
                         #    language="en",          # force English
                         #    detect_language=False   # disable auto language detection
                         # ),
-                        llm=openai.LLM(model="gpt-4.1"),
+                        llm=openai.LLM(model="gpt-4.1",temperature=0.1),
                         vad=silero.VAD.load(),
                          tts=elevenlabs.TTS(
                 # voice_id="wlmwDR77ptH6bKHZui0l",

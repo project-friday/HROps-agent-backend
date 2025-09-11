@@ -63,7 +63,7 @@ class JobApplicationAgent(Agent):
             #     language="en",          # force English
             #     detect_language=False   # disable auto language detection
             # ),
-            llm=openai.LLM(model="gpt-4.1"),
+            llm=openai.LLM(model="gpt-4.1",temperature=0.1),
             # tts=openai.TTS(model="gpt-4o-mini-tts", voice="shimmer"),
             tts=elevenlabs.TTS(
                 # voice_id="wlmwDR77ptH6bKHZui0l",

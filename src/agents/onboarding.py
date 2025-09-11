@@ -64,7 +64,7 @@ class OnboardingAgent(Agent):
                 # model="eleven_multilingual_v2",
                 model="eleven_turbo_v2_5",
             ),
-        llm=openai.LLM(model="gpt-4.1"),
+        llm=openai.LLM(model="gpt-4.1",temperature=0.1),
         vad=silero.VAD.load(),
         chat_ctx=chat_ctx,
         tools=[
