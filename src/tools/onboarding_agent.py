@@ -261,7 +261,7 @@ async def get_offer_details(name: str, email: str) -> dict:
     if not rec:
         result = {"error": "No record found"}
     else:
-        result = {"offer_letter":rec.get("offer")}
+        result = rec.get("offer")
     
     return result
 
