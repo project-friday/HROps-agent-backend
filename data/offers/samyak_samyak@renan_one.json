@@ -23,8 +23,9 @@
         "percentage": 10,
         "frequency": "quarterly",
         "criteria": "team + company goals"
-      },
-      "benefits": {
+      }
+    },
+    "benefits": {
         "insurance": "Health insurance Day-1 coverage, dependents can be added in 30 days",
         "leaves": "20 paid leaves/year + public holidays",
         "wfh_policy": "Hybrid, manager approval required for exceptions"
@@ -33,7 +34,6 @@
         "cycle": "monthly",
         "payout_day": "last working day of the month"
       }
-    }
   },
   "reporting": {
     "manager_name": "Anita Sharma",
