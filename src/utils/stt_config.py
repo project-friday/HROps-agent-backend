@@ -27,7 +27,7 @@ EMAIL_KEYTERMS = [
 
 NAMES_KEYTERMS = [
     # names you've seen problematic — add more as you discover them
-    "rajdeep", "rajdeep singh", "harshal", "samyak", "patil", "diego", "diego martinez", "miguel", "alejandro",
+    "rajdeep", "rajdeep singh", "harshal", "samyak", "patil", "Diego", "Diego martinez", "Miguel", "Alejandro",
 ]
 
 KEYTERMS = EMAIL_KEYTERMS + NAMES_KEYTERMS
