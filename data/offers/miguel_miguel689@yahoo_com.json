@@ -5,7 +5,7 @@
     "application_id": "APP12346",
     "role": "Backend Engineer",
     "level": "L2",
-    "location": "Bangalore",
+    "location": "Madrid",
     "work_model": "Hybrid (3 days onsite)"
   },
   "offer": {
@@ -14,10 +14,10 @@
     "summary": {
       "title": "Backend Engineer",
       "level": "L2",
-      "base": "Rupees 12 lakh per annum",
+      "base": "EUR 40,000 per annum",
       "variable": "10%",
       "benefits": ["Health insurance", "ESOPs"],
-      "location": "Bangalore",
+      "location": "Madrid",
       "tentative_joining": "01 Oct 2025"
     },
     "clarifications": {
@@ -27,5 +27,6 @@
     }
   }
 }
+
 
 

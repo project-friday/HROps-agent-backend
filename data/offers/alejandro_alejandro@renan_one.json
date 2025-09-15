@@ -5,7 +5,7 @@
     "application_id": "APP12345",
     "role": "Data Engineer",
     "level": "L2",
-    "location": "Bangalore Campus, Tower 3",
+    "location": "Madrid Campus, Tower 3",
     "work_model": "Hybrid (3 days onsite)"
   },
   "offer": {
@@ -18,7 +18,7 @@
       "notice_period_days": 30
     },
     "compensation": {
-      "base": "Rupees 10 lakh per annum",
+      "base": "EUR 35,000 per annum",
       "variable": {
         "percentage": 10,
         "frequency": "quarterly",
@@ -36,9 +36,9 @@
     }
   },
   "reporting": {
-    "manager_name": "Anita Sharma",
+    "manager_name": "María López",
     "manager_title": "Engineering Manager",
-    "manager_email": "anita.sharma@company.com",
+    "manager_email": "maria.lopez@company.com",
     "intro_call_scheduled": true,
     "intro_call_date": "2025-09-18T11:15"
   },
@@ -52,11 +52,11 @@
     "portal_link": "https://portal.company.com/preboarding",
     "documents": {
       "checklist": [
-        "Government ID (Passport/Aadhaar)",
+        "Government ID (Passport/DNI)",
         "Highest education certificate",
         "Last 3 months’ salary slips",
         "Relieving/experience letters (if applicable)",
-        "PAN card"
+        "NIE/TIN card"
       ]
     }
   },
@@ -95,61 +95,6 @@
     "remarks": "Starts after offer acceptance and document upload"
   },
   "negotiations": [
-    {
-      "request": "Wants to negotiate on CTC.",
-      "timestamp": "2025-09-08T09:00:43.231703Z"
-    },
-    {
-      "request": "Wants to negotiate on CTC.",
-      "timestamp": "2025-09-08T09:00:43.273918Z"
-    },
-    {
-      "request": "Request to reconsider and revisit base salary component.",
-      "timestamp": "2025-09-08T09:01:23.552105Z"
-    },
-    {
-      "request": "Request to reconsider and revisit base salary component.",
-      "timestamp": "2025-09-08T09:01:23.587831Z"
-    },
-    {
-      "request": "The candidate would like to negotiate on salary.",
-      "timestamp": "2025-09-08T18:14:07.534337Z"
-    },
-    {
-      "request": "The candidate would like to negotiate on salary.",
-      "timestamp": "2025-09-08T18:14:07.592082Z"
-    },
-    {
-      "request": "Negotiate on salary",
-      "timestamp": "2025-09-08T18:14:19.487761Z"
-    },
-    {
-      "request": "Negotiate on salary",
-      "timestamp": "2025-09-08T18:14:19.529849Z"
-    },
-    {
-      "request": "Requesting higher salary because he believes he deserves more and has reduced costs at his previous company.",
-      "timestamp": "2025-09-08T18:29:07.119451Z"
-    },
-    {
-      "request": "Requesting higher salary because he believes he deserves more and has reduced costs at his previous company.",
-      "timestamp": "2025-09-08T18:29:07.149776Z"
-    },
-    {
-      "request": "Candidate wishes to negotiate for a higher compensation based on market standards, their unique skill set, and the potential impact they can bring to the company.",
-      "timestamp": "2025-09-08T18:32:18.097417Z"
-    },
-    {
-      "request": "Candidate wishes to negotiate for a higher compensation based on market standards, their unique skill set, and the potential impact they can bring to the company.",
-      "timestamp": "2025-09-08T18:32:18.129924Z"
-    },
-    {
-      "request": "Wants to negotiate for higher CTC based on market standards and individual skill set.",
-      "timestamp": "2025-09-10T13:40:42.048281Z"
-    },
-    {
-      "request": "Wants to negotiate for higher CTC based on market standards and individual skill set.",
-      "timestamp": "2025-09-10T13:40:42.074366Z"
-    }
+
   ]
 }

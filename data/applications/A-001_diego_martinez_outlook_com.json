@@ -1,7 +1,7 @@
 {
   "application_id": "A-001",
   "email": "diego.martinez@outlook.com",
-  "name": "Diego",
+  "name": "Diego Martinez",
   "phone": "+91 98xxxxxx12",
   "job_id": "JR-101",
   "job_title": "AI Engineer",
@@ -9,51 +9,15 @@
   "resume_reviewed": "Not yet",
   "updated_at": "2025-09-15T09:51+00:00",
   "response_timeframe": "Immediate",
-  "description": "Interview scheduled for Sep 15, 2025 at 10:30 AM via Google Meet. Recruiter: Priya Sharma. Please keep your portfolio ready.",
+  "description": "Interview scheduled for Sep 15, 2025 at 10:30 AM via Google Meet. Recruiter: María González. Please keep your portfolio ready.",
   "interview": {
     "status": "rescheduled",
-    "scheduled_at": "2025-09-17T16:15+05:30",
-    "timezone": "Asia/Kolkata",
+    "scheduled_at": "2025-09-17T16:15+02:00",
+    "timezone": "Europe/Madrid",
     "mode": "video",
     "location_or_link": "https://meet.google.com/xyz-123",
-    "interviewer": "Priya Sharma"
+    "interviewer": "María González"
   },
   "reschedules": [
-    {
-      "old_time": "2025-09-08T11:00:00+05:30",
-      "new_time": "2025-09-15T11:00:00+05:30",
-      "changed_at": "2025-09-06T17:16:00+00:00",
-      "reason": "candidate_request"
-    },
-    {
-      "old_time": "2025-09-23T10:30+05:30",
-      "new_time": "2025-09-25T13:00+05:30",
-      "changed_at": "2025-09-08T17:27+00:00",
-      "reason": "Candidate requested reschedule to September 25th at 1:30 PM"
-    },
-    {
-      "old_time": "2025-09-25T13:00+05:30",
-      "new_time": "2025-09-16T16:15+05:30",
-      "changed_at": "2025-09-15T07:49+00:00",
-      "reason": null
-    },
-    {
-      "old_time": "2025-09-16T16:15+05:30",
-      "new_time": "2025-09-16T16:15+05:30",
-      "changed_at": "2025-09-15T07:49+00:00",
-      "reason": "candidate_request"
-    },
-    {
-      "old_time": "2025-09-16T16:15+05:30",
-      "new_time": "2025-09-17T16:15+05:30",
-      "changed_at": "2025-09-15T09:51+00:00",
-      "reason": null
-    },
-    {
-      "old_time": "2025-09-17T16:15+05:30",
-      "new_time": "2025-09-17T16:15+05:30",
-      "changed_at": "2025-09-15T09:51+00:00",
-      "reason": "candidate_request"
-    }
   ]
 }
