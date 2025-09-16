@@ -5,7 +5,7 @@ EMAIL_KEYTERMS = [
     "gmail","g mail","yahoo","y mail","outlook","out look",
 
     # Your / client domains (add more as needed)
-    "renan.one","renan dot one","renan","walmart.com","walmart dot com","walmart",  # keep if you expect it
+    "renan.one","renan dot one","renan","hsbc.com","hsbc dot com","hsbc",  # keep if you expect it
 
     # Symbol words people say while dictating emails
     "at the rate","at","dot","underscore","under score","hyphen","dash",
