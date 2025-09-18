@@ -5,6 +5,7 @@ from src.agents.job_application import JobApplicationAgent
 from src.agents.onboarding import OnboardingAgent
 from livekit.plugins import assemblyai, elevenlabs,openai, silero
 from src.utils.stt_config import make_deepgram_stt
+from src.agents.assessment import AssessmentAgent
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -53,6 +54,14 @@ class RouterAgent(Agent):
         return (
             JobApplicationAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
         )
+    
+    @function_tool
+    async def go_assessment(self, context: RunContext[dict]):
+        agent = context.session.current_agent
+        return (
+            AssessmentAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
+        )
+    
 
     # --- speaks immediately after the router becomes active ---
     async def on_enter(self):
