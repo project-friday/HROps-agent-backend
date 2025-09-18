@@ -7,15 +7,34 @@ from livekit.plugins import assemblyai, elevenlabs,openai, silero
 from src.utils.stt_config import make_deepgram_stt
 from dotenv import load_dotenv
 from pathlib import Path
+from src.config.loader import get_cfg, render
 
 load_dotenv()
+
+CFG = get_cfg()
+ENABLED = set(CFG["enabled_agents"])
 
 
 def load_prompt(file_path: str) -> str:
     return Path(file_path).read_text(encoding="utf-8").strip()
 
 
-ROUTER_INSTRUCTIONS = load_prompt("src/prompts/router.txt")
+ROUTER_INSTRUCTIONS = render(load_prompt("src/prompts/router.txt"))
+
+# Add a runtime snippet so the LLM only sees brand-allowed tools
+tools_lines = []
+if "Applications" in ENABLED:
+    tools_lines.append("- `go_applications` → application status/updates, application ID, job ID (JR-xxx), stages (submitted/in review/interview/selected/rejected) OR General HR FAQs via the knowledge base (RAG).")
+if "Onboarding" in ENABLED:
+    tools_lines.append("- `go_onboarding`  → offer letter, joining date/DOJ, pre-boarding, required documents, background check (BGV), reporting manager, location, workstation/laptop.")
+
+TOOLS_SNIPPET = (
+    "You are **Eve** from the {{company_name}} Talent Acquisition Team as the **router**. Decide which domain should handle the user’s request and call exactly one transfer tool:\n"
+    "Available transfer tools:\n" + ("\n".join(tools_lines) if tools_lines else "- (none)\n")
+)
+
+ROUTER_INSTRUCTIONS = TOOLS_SNIPPET + ROUTER_INSTRUCTIONS
+
 
 class RouterAgent(Agent):
     def __init__(self,room:rtc.Room):
@@ -39,24 +58,39 @@ class RouterAgent(Agent):
 
                          )
 
-    @function_tool
-    async def go_onboarding(self, context: RunContext[dict]):
-        agent = context.session.current_agent
-        # Generic, smooth transition
-        return (
-            OnboardingAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
-        )
+    # expose Onboarding only if enabled
+    if "Onboarding" in ENABLED:
+        @function_tool
+        async def go_onboarding(self, context: RunContext[dict]):
+            agent = context.session.current_agent
+            # Generic, smooth transition
+            return (
+                OnboardingAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
+            )
 
-    @function_tool
-    async def go_applications(self, context: RunContext[dict]):
-        agent = context.session.current_agent
-        return (
-            JobApplicationAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
-        )
+    # expose Applications only if enabled
+    if "Applications" in ENABLED:
+        @function_tool
+        async def go_applications(self, context: RunContext[dict]):
+            agent = context.session.current_agent
+            return (
+                JobApplicationAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
+            )
+     
+    # # Walmart-only: Assessment
+    # if "Assessment" in ENABLED:
+    #     from src.agents.assessment import AssessmentAgent
+
+    #     @function_tool
+    #     async def go_assessment(self, context: RunContext[dict]):
+    #         agent = context.session.current_agent
+    #         return (
+    #             AssessmentAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
+    #         )
 
     # --- speaks immediately after the router becomes active ---
     async def on_enter(self):
-        await self.session.say("Hey there, I’m Eve, speaking from HSBC Talent Acquisition Team. How may I help you?")
+        await self.session.say(get_cfg()["greeting"])
 
     
 
