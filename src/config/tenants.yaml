@@ -1,0 +1,11 @@
+tenants:
+  hsbc:
+    company_name: "HSBC"
+    greeting: "Hey there, I’m Eve, speaking from HSBC Talent Acquisition Team. How may I help you?"
+    enabled_agents: ["Applications", "Onboarding"]
+
+  walmart:
+    company_name: "Walmart"
+    greeting: "Hey there, I’m Eve, speaking from Walmart Talent Acquisition Team. How may I help you?"
+    # Add Walmart-only flows here as you build them
+    enabled_agents: ["Applications"]
