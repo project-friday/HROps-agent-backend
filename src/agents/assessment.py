@@ -1,4 +1,3 @@
-#______________________________________________________________________________________________#
 # src/agents/assessment_agent.py
 from __future__ import annotations
 from typing import AsyncGenerator, Dict, Any
@@ -13,9 +12,14 @@ from dotenv import load_dotenv
 from livekit import rtc
 
 # ---- Import assessment tools ----
-# from src.tools.assessment_agent import (
-
-# )
+from src.tools.assessment_agent import (
+    get_assessment_details,
+    check_assessment_status,
+    reschedule_assessment,
+    send_assessment_reminder,
+    escalate_to_assessment_team,
+    get_assessment_result,
+)
 from src.utils.stt_config import make_deepgram_stt
 
 load_dotenv()
@@ -54,50 +58,49 @@ class AssessmentAgent(Agent):
             vad=silero.VAD.load(min_speech_duration=0.1),
             chat_ctx=chat_ctx,
             tools=[
-                # list_assessments_by_email,
-                # get_assessment_details,
-                # check_assessment_status,
-                # reschedule_assessment,
-                # send_assessment_reminder,
-                # escalate_to_assessment_team,
-                # query_assessment_knowledge_base,
+                get_assessment_details,
+                check_assessment_status,
+                reschedule_assessment,
+                send_assessment_reminder,
+                escalate_to_assessment_team,
+                get_assessment_result,
             ],
         )
 
         # Map actions to functions
         self.actions = {
-            # "Fetching Assessments": list_assessments_by_email,
-            # "Getting Assessment Details": get_assessment_details,
-            # "Checking Assessment Status": check_assessment_status,
-            # "Rescheduling Assessment": reschedule_assessment,
-            # "Sending Reminder": send_assessment_reminder,
-            # "Escalating to Assessment Team": escalate_to_assessment_team,
-            # "Querying Knowledge Base": query_assessment_knowledge_base,
+            "Getting Assessment Details": get_assessment_details,
+            "Checking Assessment Status": check_assessment_status,
+            "Rescheduling Assessment": reschedule_assessment,
+            "Sending Assessment Reminder": send_assessment_reminder,
+            "Escalating to Assessment Team": escalate_to_assessment_team,
+            "Getting Assessment Result": get_assessment_result,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
+
         self.tool_result_filters = {
-            # list_assessments_by_email: ["email"],
-            # check_assessment_status: ["status", "deadline", "submitted_at", "score"],
-            # reschedule_assessment: ["reschedule_args"],
-            # get_assessment_details: ["assessment_id", "instructions", "duration"],
+            check_assessment_status: ["status", "deadline", "submitted_at", "score"],
+            reschedule_assessment: ["new_deadline"],
+            get_assessment_details: ["instructions", "duration"],
+            get_assessment_result: ["result", "score", "submitted_at"],
         }
 
-        # 🎴 Card mapping for frontend
         self.tool_cards = {
-            # list_assessments_by_email: "assessments_list",
-            # get_assessment_details: "assessment_details",
-            # check_assessment_status: "assessment_status",
-            # reschedule_assessment: "assessment_reschedule",
-            # send_assessment_reminder: "assessment_reminder",
-            # escalate_to_assessment_team: "assessment_escalation",
-            # query_assessment_knowledge_base: "knowledge_base",
+            get_assessment_details: "assessment_details",
+            check_assessment_status: "assessment_status",
+            reschedule_assessment: "assessment_reschedule",
+            send_assessment_reminder: "assessment_reminder",
+            escalate_to_assessment_team: "assessment_escalation",
+            get_assessment_result: "assessment_result",
         }
 
         self.visible_tools = {
-            # list_assessments_by_email,
-            # get_assessment_details,
-            # check_assessment_status,
-            # reschedule_assessment,
+            get_assessment_details,
+            check_assessment_status,
+            reschedule_assessment,
+            send_assessment_reminder,
+            escalate_to_assessment_team,
+            get_assessment_result,
         }
 
     async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None, tool_func=None):
@@ -186,7 +189,7 @@ class AssessmentAgent(Agent):
 
         # Capture final LLM response
         self.last_llm_response = "".join(buffer).strip()
-        print("✅ Full LLM response captured:", self.last_llm_response)
+        # print("✅ Full LLM response captured:", self.last_llm_response)
 
         # Execute queued tools and send results
         for action_name, tool_function, tool_args in pending_tools:
@@ -210,6 +213,3 @@ class AssessmentAgent(Agent):
     async def on_enter(self):
         """Speaks immediately after the agent becomes active (e.g., after handover)."""
         await self.session.generate_reply()
-
-
-#______________________________________________________________________________________________#
