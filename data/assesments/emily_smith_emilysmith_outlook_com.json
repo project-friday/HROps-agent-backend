@@ -1,0 +1,12 @@
+{
+  "name": "Emily Smith",
+  "email": "emily.smith@outlook.com",
+  "assessment": {
+    "id": "assess_302",
+    "title": "Situational Judgment Test",
+    "status": "Completed",
+    "submitted_at": "2025-09-14T14:15:00",
+    "score": 78,
+    "result": "Yellow"
+  }
+}
