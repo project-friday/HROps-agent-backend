@@ -1,0 +1,97 @@
+{
+  "candidate": {
+    "name": "Hashif",
+    "email": "hashif@renan.one",
+    "application_id": "APP54321",
+    "role": "Director of Engineering",
+    "level": "L2",
+    "location": "Pune Campus, Tower 4",
+    "work_model": "Onsite"
+  },
+  "offer": {
+    "status": "accepted",
+    "sent_date": "2025-09-03",
+    "acceptance_date": "2025-09-07",
+    "joining_date": "2025-09-27",
+    "probation": {
+      "duration_months": 6,
+      "notice_period_days": 60
+    },
+    "compensation": {
+      "base": "Rupees 9 lakh per annum",
+      "variable": {
+        "percentage": 15,
+        "frequency": "quarterly",
+        "criteria": "team + project milestones"
+      }
+    },
+    "benefits": {
+      "insurance": "Health + parental insurance",
+      "leaves": "22 paid leaves/year",
+      "wfh_policy": "Onsite, exceptions allowed with manager approval"
+    },
+    "payroll": {
+      "cycle": "monthly",
+      "payout_day": "last working day"
+    }
+  },
+  "reporting": {
+    "manager_name": "Suresh Iyer",
+    "manager_title": "Engineering Lead",
+    "manager_email": "suresh.iyer@company.com",
+    "intro_call_scheduled": true,
+    "intro_call_date": "2025-09-21T11:00"
+  },
+  "preboarding": {
+    "tasks": [
+      "Offer acceptance",
+      "Bank details submission",
+      "Policy acknowledgement"
+    ],
+    "portal_link": "https://portal.company.com/preboarding",
+    "documents": {
+      "checklist": [
+        "Government ID",
+        "Highest degree certificate",
+        "PAN card"
+      ]
+    }
+  },
+  "it_assets": {
+    "laptop_shipping": "Dispatched after acceptance",
+    "email_provisioning": "3 days before joining",
+    "vpn_access": "2 days before joining",
+    "preferred_shipping_address": null,
+    "day1_agenda": {
+      "orientation": "9:00 AM Welcome Session",
+      "activities": [
+        "HR paperwork",
+        "Security briefing",
+        "Team lunch"
+      ]
+    }
+  },
+  "escalations": {
+    "offer_hold": {
+      "status": false,
+      "reason": null,
+      "eta": null
+    },
+    "joining_deferral": {
+      "requested": false,
+      "new_date": null
+    },
+    "visa_support": {
+      "required": false,
+      "status": null
+    }
+  },
+  "bgv": {
+    "status": "pending",
+    "expected_days": "5-10",
+    "remarks": "",
+    "link_issue": "Recruiter or store manager will share a new link if the candidate cannot access it.",
+    "dispute_info": ""
+  },
+  "negotiations": []
+}
