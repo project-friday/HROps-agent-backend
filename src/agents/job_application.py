@@ -1,34 +1,39 @@
-#______________________________________________________________________________________________#
+# ______________________________________________________________________________________________#
 # src/agents/job_application.py
 from __future__ import annotations
-from typing import AsyncGenerator,Dict, Any
-import logging
-from livekit.agents.voice import Agent,ModelSettings
-from livekit.plugins import openai, silero, assemblyai, deepgram
-from livekit.plugins import elevenlabs
-from livekit.agents import llm
+
 import asyncio
-import aiofiles
 import json
+import logging
 from pathlib import Path
+from typing import Any, AsyncGenerator, Dict
+
+import aiofiles
+
 # from custom.livekit.plugins import murfai
 from dotenv import load_dotenv
 from livekit import rtc
+from livekit.agents import llm, stt, utils
+from livekit.agents.stt import SpeechEventType
+from livekit.agents.voice import Agent, ModelSettings
+from livekit.plugins import assemblyai, deepgram, elevenlabs, openai, silero
+
 from src.tools.handover import handover_to_onboarding
+
 # ---- import the REAL tools directly ----
 from src.tools.job_application_agent import (
-    list_applications_by_email,
-    select_application_by_choice,
     check_application_status,
-    query_knowledge_base,
-    get_upcoming_interview,
     check_interview_availability,
-    reschedule_interview,
+    email_conversation_summary,
     escalate_to_hiring_team,
-    email_conversation_summary
-    
+    get_upcoming_interview,
+    list_applications_by_email,
+    query_knowledge_base,
+    reschedule_interview,
+    select_application_by_choice,
 )
 from src.utils.stt_config import make_deepgram_stt
+from src.utils.translator import translate_to_english
 
 load_dotenv()
 
@@ -36,10 +41,12 @@ load_dotenv()
 def load_prompt(file_path: str) -> str:
     return Path(file_path).read_text(encoding="utf-8").strip()
 
+
 logger = logging.getLogger("hr-eve-agent")
 logger.setLevel(logging.INFO)
 
-EVE_SYSTEM_PROMPT =load_prompt("src/prompts/job_application.txt")
+EVE_SYSTEM_PROMPT = load_prompt("src/prompts/job_application.txt")
+
 
 class JobApplicationAgent(Agent):
     """
@@ -51,21 +58,21 @@ class JobApplicationAgent(Agent):
     - Status-only answer; keep details for follow-ups
     """
 
-    def __init__(self,room:rtc.Room,chat_ctx=None) -> None:
-        self.room=room
+    def __init__(self, room: rtc.Room, chat_ctx=None) -> None:
+        self.room = room
         super().__init__(
             instructions=EVE_SYSTEM_PROMPT,
-            stt=deepgram.STT(language='es'),
-                            llm=openai.LLM(model="gpt-4.1"),
-                            vad=silero.VAD.load(),
-                            tts=elevenlabs.TTS(
-                    # voice_id="wlmwDR77ptH6bKHZui0l",
-                    # voice_id="H8bdWZHK2OgZwTN7ponr",
-                    # voice_id="hHjbwzYZW17oh0p05AKv",
-                    voice_id="kjHz50TasdqbpbfK4uaN",
-                    model="eleven_turbo_v2_5",
-                    language='es'
-                ),
+            stt=deepgram.STT(language="es"),
+            llm=openai.LLM(model="gpt-4.1"),
+            vad=silero.VAD.load(),
+            tts=elevenlabs.TTS(
+                # voice_id="wlmwDR77ptH6bKHZui0l",
+                # voice_id="H8bdWZHK2OgZwTN7ponr",
+                # voice_id="hHjbwzYZW17oh0p05AKv",
+                voice_id="kjHz50TasdqbpbfK4uaN",
+                model="eleven_turbo_v2_5",
+                language="es",
+            ),
             chat_ctx=chat_ctx,
             tools=[
                 list_applications_by_email,
@@ -74,10 +81,10 @@ class JobApplicationAgent(Agent):
                 query_knowledge_base,
                 get_upcoming_interview,
                 check_interview_availability,
-                reschedule_interview, 
+                reschedule_interview,
                 handover_to_onboarding,
                 escalate_to_hiring_team,
-                email_conversation_summary
+                email_conversation_summary,
             ],
         )
 
@@ -95,8 +102,15 @@ class JobApplicationAgent(Agent):
         self.function_to_action = {v: k for k, v in self.actions.items()}
         self.tool_result_filters = {
             list_applications_by_email: ["email"],
-            check_application_status: ["email", "phone","human_status","updated_at_human","reschedules","found"],
-            get_upcoming_interview: ["has_interview","application_id"],
+            check_application_status: [
+                "email",
+                "phone",
+                "human_status",
+                "updated_at_human",
+                "reschedules",
+                "found",
+            ],
+            get_upcoming_interview: ["has_interview", "application_id"],
             reschedule_interview: ["reschedule_args"],
         }
 
@@ -119,7 +133,9 @@ class JobApplicationAgent(Agent):
             reschedule_interview,
         }
 
-    async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None, tool_func=None):
+    async def _send_websocket_message(
+        self, action: str, result: Dict[str, Any] = None, tool_func=None
+    ):
         """Send WebSocket message with action, filtered result, and card_name."""
         message = {"action": action}
 
@@ -133,12 +149,81 @@ class JobApplicationAgent(Agent):
 
         try:
             await self.room.local_participant.send_text(
-                json.dumps(message),
-                topic="lk.transcription"
+                json.dumps(message), topic="lk.transcription"
             )
             print(f"✅ Sent WebSocket message: {message}")
         except Exception as e:
             print(f"❌ Failed to send WebSocket message: {e}")
+
+    async def _translate_and_send_llm_response(
+        self, raw_response: str, role: str
+    ) -> None:
+        """
+        Translate the final LLM response to English and send it to the WebSocket.
+        Falls back to the raw response if translation fails.
+        """
+        try:
+            translated_text = await translate_to_english(text=raw_response)
+            print("🌍 Translated to English:", translated_text)
+        except Exception as e:
+            print(f"⚠️ Translation failed, sending raw text: {e}")
+            translated_text = raw_response
+
+        # 📤 Forward translated response to WebSocket
+        try:
+            await self.room.local_participant.send_text(
+                json.dumps({"role": role, "translation": translated_text}),
+                topic="lk.transcription",
+            )
+            print("📤 Translated response sent to WebSocket")
+        except Exception as e:
+            print(f"⚠️ Failed to forward translated response: {e}")
+
+    async def stt_node(
+        self,
+        audio: AsyncGenerator[rtc.AudioFrame, None],
+        model_settings: ModelSettings,
+    ) -> AsyncGenerator[stt.SpeechEvent, None]:
+        """Custom STT node that intercepts only finalized transcripts."""
+        print("🎤 Starting custom STT node...")
+        activity = self._get_activity_or_raise()
+        assert activity.stt is not None, "stt_node called but no STT node is available"
+
+        wrapped_stt = activity.stt
+        if not activity.stt.capabilities.streaming:
+            if not activity.vad:
+                raise RuntimeError(
+                    f"The STT ({activity.stt.label}) does not support streaming, add a VAD"
+                )
+            wrapped_stt = stt.StreamAdapter(stt=wrapped_stt, vad=activity.vad)
+
+        conn_options = activity.session.conn_options.stt_conn_options
+        async with wrapped_stt.stream(conn_options=conn_options) as stream:
+
+            @utils.log_exceptions()
+            async def _forward_input() -> None:
+                async for frame in audio:
+                    stream.push_frame(frame)
+
+            print("🎤 Launched audio forwarding task")
+            forward_task = asyncio.create_task(_forward_input())
+            try:
+                async for event in stream:
+
+                    if event.type == SpeechEventType.FINAL_TRANSCRIPT:
+                        if event.alternatives:
+                            transcript = event.alternatives[0].text
+                            print(f"📝 Final transcript: {transcript}")
+
+                            # 📤 Forward finalized transcript to WebSocket
+                            await self._translate_and_send_llm_response(
+                                transcript, "user"
+                            )
+
+                    # Always yield back into agent pipeline
+                    yield event
+            finally:
+                await utils.aio.cancel_and_wait(forward_task)
 
     async def llm_node(
         self,
@@ -186,7 +271,9 @@ class JobApplicationAgent(Agent):
                                 try:
                                     tool_args = json.loads(tool_args)
                                 except json.JSONDecodeError:
-                                    print(f"⚠️ Invalid JSON for {tool_name}: {tool_args}")
+                                    print(
+                                        f"⚠️ Invalid JSON for {tool_name}: {tool_args}"
+                                    )
                                     tool_args = {}
 
                             tool_function = None
@@ -202,13 +289,16 @@ class JobApplicationAgent(Agent):
                                 await self._send_websocket_message(action_name)
 
                                 # Queue tool execution after LLM finishes
-                                pending_tools.append((action_name, tool_function, tool_args))
+                                pending_tools.append(
+                                    (action_name, tool_function, tool_args)
+                                )
 
                 yield chunk
 
         # Capture final LLM response
-        self.last_llm_response = "".join(buffer).strip()
-        print("✅ Full LLM response captured:", self.last_llm_response)
+        llm_response = "".join(buffer).strip()
+        print("✅ Full LLM response captured:", llm_response)
+        await self._translate_and_send_llm_response(llm_response, "bot")
 
         # Execute queued tools and send results
         for action_name, tool_function, tool_args in pending_tools:
@@ -222,17 +312,20 @@ class JobApplicationAgent(Agent):
                 else:
                     result = tool_function(**tool_args)
 
-                await self._send_websocket_message(action_name, result, tool_func=tool_function)
+                await self._send_websocket_message(
+                    action_name, result, tool_func=tool_function
+                )
                 print(f"✅ Sent result for {action_name}: {result}")
 
             except Exception as e:
-                await self._send_websocket_message(action_name, {"error": str(e)}, tool_func=tool_function)
+                await self._send_websocket_message(
+                    action_name, {"error": str(e)}, tool_func=tool_function
+                )
                 print(f"❌ Tool execution failed for {action_name}: {e}")
 
     # --- speaks immediately after the agent becomes active (e.g., after handover) ---
     async def on_enter(self):
-        await self.session.generate_reply(
-        )
+        await self.session.generate_reply()
 
 
-#______________________________________________________________________________________________#
+# ______________________________________________________________________________________________#
