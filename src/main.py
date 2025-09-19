@@ -1,32 +1,23 @@
 # src/main.py
-import logging
 import os
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from livekit import rtc
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession, room_io
-from livekit.plugins import assemblyai, noise_cancellation
+from livekit.plugins import noise_cancellation
 
 from src.agents.router import RouterAgent
-from src.models.data import CandidateData
+from src.helpers.arg_parser import parse_cli_args
 
-# --- NEW: stash tenant arg early, before cli.run_app ---
-TENANT = "walmart"
-if "--tenant" in sys.argv:
-    print("Found --tenant arg, overriding default tenant")
-    idx = sys.argv.index("--tenant")
-    if idx + 1 < len(sys.argv):
-        TENANT = sys.argv[idx + 1]
-        print(f"Using tenant: {TENANT}")
-        # strip these args so LiveKit's CLI doesn't get confused
-        sys.argv = sys.argv[:idx] + sys.argv[idx + 2 :]
+# Make tenant & flow globally available
+TENANT, FLOW, sys.argv = parse_cli_args(sys.argv)
 
-# Make tenant globally available
+# Make tenant & flow globally available
 os.environ["TENANT_CLI_OVERRIDE"] = TENANT
-print(f"{os.environ['TENANT_CLI_OVERRIDE']}")
+os.environ["FLOW_CLI_OVERRIDE"] = FLOW
+print(f"Tenant={TENANT}, Flow={FLOW}")
 
 
 # Load .env from repo root
