@@ -55,3 +55,11 @@ async def go_applications(context: RunContext[dict]):
 
     agent = context.session.current_agent
     return JobApplicationAgent(room=agent.room, chat_ctx=context.session._chat_ctx)
+
+
+@function_tool
+async def go_assessment(self, context: RunContext[dict]):
+    from src.agents.assessment import AssessmentAgent  # local import avoids cycles
+
+    agent = context.session.current_agent
+    return (AssessmentAgent(room=agent.room, chat_ctx=context.session._chat_ctx),)
