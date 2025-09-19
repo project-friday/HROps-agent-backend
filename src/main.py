@@ -1,31 +1,32 @@
 # src/main.py
-import os
 import logging
+import os
+import sys
 from pathlib import Path
-from dotenv import load_dotenv
-from livekit.plugins import openai 
 
+from dotenv import load_dotenv
+from livekit import rtc
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession, room_io
-from livekit.plugins import noise_cancellation
-from livekit import rtc
-from src.agents.job_application import JobApplicationAgent
-from src.agents.onboarding import OnboardingAgent
+from livekit.plugins import assemblyai, noise_cancellation
 
-# Configure detailed logging
-# logging.basicConfig(
-#     level=logging.WARN,
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-# )
-# logger = logging.getLogger(__name__)
-from livekit.plugins import silero, assemblyai, elevenlabs
-
-# from src.agents.job_application import JobApplicationAgent
-# from src.agents.onboarding import OnboardingAgent
 from src.agents.router import RouterAgent
 from src.models.data import CandidateData
 
+# --- NEW: stash tenant arg early, before cli.run_app ---
+TENANT = "walmart"
+if "--tenant" in sys.argv:
+    print("Found --tenant arg, overriding default tenant")
+    idx = sys.argv.index("--tenant")
+    if idx + 1 < len(sys.argv):
+        TENANT = sys.argv[idx + 1]
+        print(f"Using tenant: {TENANT}")
+        # strip these args so LiveKit's CLI doesn't get confused
+        sys.argv = sys.argv[:idx] + sys.argv[idx + 2 :]
 
+# Make tenant globally available
+os.environ["TENANT_CLI_OVERRIDE"] = TENANT
+print(f"{os.environ['TENANT_CLI_OVERRIDE']}")
 
 
 # Load .env from repo root
@@ -34,14 +35,10 @@ load_dotenv(ROOT / ".env")
 if not os.getenv("OPENAI_API_KEY"):
     raise RuntimeError(f"OPENAI_API_KEY missing. Expected in {ROOT / '.env'}")
 
+
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
-    session=AgentSession()
-    # attach disconnect handler
-    # @ctx.room.on("participant_disconnected")
-    # async def _on_disconnected(_):
-    #     print("Room disconnected → clearing session history")      # gracefully stop
-    #     session._chat_ctx.empty()    # drop past conversation memory
+    session = AgentSession()
 
     await session.start(
         agent=RouterAgent(room=ctx.room),
