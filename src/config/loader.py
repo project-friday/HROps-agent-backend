@@ -16,25 +16,40 @@ _PLACEHOLDER = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
 
 
 def get_cfg() -> dict:
-    """Load tenants.yaml once and return the active tenant config."""
+    """Load tenants.yaml once and return the active tenant+flow config."""
     global _CFG
     if _CFG is not None:
         return _CFG
 
     path = Path(__file__).with_name("tenants.yaml")
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
 
-    # Tenant is passed in main.py via --tenant and set as env var
+    # Get tenant and flow from environment (set in main.py)
     tenant = os.getenv("TENANT_CLI_OVERRIDE", "walmart")
-    print(f"Using tenant config: {tenant}")
+    flow = os.getenv("FLOW_CLI_OVERRIDE", "default")
+    print(f"Using tenant config: {tenant}, flow: {flow}")
 
-    if tenant not in data["tenants"]:
+    tenants = data.get("tenants", {})
+    if tenant not in tenants:
         raise ValueError(
-            f"Unknown tenant '{tenant}'. Available: {list(data['tenants'])}"
+            f"Unknown tenant '{tenant}'. Available tenants: {list(tenants.keys())}"
         )
 
-    cfg = {"tenant": tenant, **data["tenants"][tenant]}
-    cfg.setdefault("enabled_agents", ["Applications", "Onboarding", "Assessment"])
+    tenant_cfg = tenants[tenant]
+
+    # Merge tenant-level and flow-level enabled_agents
+    flow_cfg = tenant_cfg.get("flows", {}).get(flow, {})
+    enabled_agents = flow_cfg.get(
+        "enabled_agents",
+        tenant_cfg.get("enabled_agents", ["Applications", "Onboarding", "Assessment"]),
+    )
+
+    cfg = {"tenant": tenant, "flow": flow, **tenant_cfg}
+    cfg["enabled_agents"] = enabled_agents
+
     _CFG = cfg
     return _CFG
 
