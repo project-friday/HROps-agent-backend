@@ -2,7 +2,7 @@
 import os
 import logging
 from pathlib import Path
-from dotenv import load_dotenv
+
 from livekit.plugins import openai 
 
 from livekit.agents import JobContext, WorkerOptions, cli
@@ -11,6 +11,7 @@ from livekit.plugins import noise_cancellation
 from livekit import rtc
 from src.agents.job_application import JobApplicationAgent
 from src.agents.onboarding import OnboardingAgent
+from dotenv import load_dotenv
 
 # Configure detailed logging
 # logging.basicConfig(
