@@ -1,24 +1,26 @@
 # src/agents/assessment_agent.py
 from __future__ import annotations
-from typing import AsyncGenerator, Dict, Any
-import logging
-from livekit.agents.voice import Agent, ModelSettings
-from livekit.plugins import openai, silero, assemblyai, elevenlabs
-from livekit.agents import llm
+
 import asyncio
 import json
+import logging
 from pathlib import Path
+from typing import Any, AsyncGenerator, Dict
+
 from dotenv import load_dotenv
 from livekit import rtc
+from livekit.agents import llm
+from livekit.agents.voice import Agent, ModelSettings
+from livekit.plugins import assemblyai, elevenlabs, openai, silero
 
 # ---- Import assessment tools ----
 from src.tools.assessment_agent import (
-    get_assessment_details,
     check_assessment_status,
+    escalate_to_assessment_team,
+    get_assessment_details,
+    get_assessment_result,
     reschedule_assessment,
     send_assessment_reminder,
-    escalate_to_assessment_team,
-    get_assessment_result,
 )
 from src.utils.stt_config import make_deepgram_stt
 
@@ -78,11 +80,12 @@ class AssessmentAgent(Agent):
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
+        # keys that should be filtered out from tool results before sending to frontend
         self.tool_result_filters = {
-            check_assessment_status: ["status", "deadline", "submitted_at", "score"],
-            reschedule_assessment: ["new_deadline"],
+            # check_assessment_status: ["status", "deadline", "submitted_at", "score"],
+            # reschedule_assessment: ["new_deadline"],
             get_assessment_details: ["instructions", "duration"],
-            get_assessment_result: ["result", "score", "submitted_at"],
+            get_assessment_result: ["submitted_at"],
         }
 
         self.tool_cards = {
@@ -103,7 +106,9 @@ class AssessmentAgent(Agent):
             get_assessment_result,
         }
 
-    async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None, tool_func=None):
+    async def _send_websocket_message(
+        self, action: str, result: Dict[str, Any] = None, tool_func=None
+    ):
         """Send WebSocket message with action, filtered result, and card_name."""
         message = {"action": action}
 
@@ -117,8 +122,7 @@ class AssessmentAgent(Agent):
 
         try:
             await self.room.local_participant.send_text(
-                json.dumps(message),
-                topic="lk.transcription"
+                json.dumps(message), topic="lk.transcription"
             )
             print(f"✅ Sent WebSocket message: {message}")
         except Exception as e:
@@ -170,7 +174,9 @@ class AssessmentAgent(Agent):
                                 try:
                                     tool_args = json.loads(tool_args)
                                 except json.JSONDecodeError:
-                                    print(f"⚠️ Invalid JSON for {tool_name}: {tool_args}")
+                                    print(
+                                        f"⚠️ Invalid JSON for {tool_name}: {tool_args}"
+                                    )
                                     tool_args = {}
 
                             tool_function = None
@@ -183,7 +189,9 @@ class AssessmentAgent(Agent):
 
                             if tool_function and action_name:
                                 await self._send_websocket_message(action_name)
-                                pending_tools.append((action_name, tool_function, tool_args))
+                                pending_tools.append(
+                                    (action_name, tool_function, tool_args)
+                                )
 
                 yield chunk
 
@@ -203,11 +211,15 @@ class AssessmentAgent(Agent):
                 else:
                     result = tool_function(**tool_args)
 
-                await self._send_websocket_message(action_name, result, tool_func=tool_function)
+                await self._send_websocket_message(
+                    action_name, result, tool_func=tool_function
+                )
                 print(f"✅ Sent result for {action_name}: {result}")
 
             except Exception as e:
-                await self._send_websocket_message(action_name, {"error": str(e)}, tool_func=tool_function)
+                await self._send_websocket_message(
+                    action_name, {"error": str(e)}, tool_func=tool_function
+                )
                 print(f"❌ Tool execution failed for {action_name}: {e}")
 
     async def on_enter(self):

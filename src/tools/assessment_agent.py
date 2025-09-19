@@ -1,10 +1,14 @@
+import json
+import os
+
 from livekit.agents import function_tool
-import json, os
 
 DATA_PATH = "data/assesments"
 
+
 def _normalize(s: str) -> str:
     return s.strip().lower().replace(" ", "_").replace("@", "_").replace(".", "_")
+
 
 def _load_candidate_record(name: str, email: str) -> dict:
     fname = f"{_normalize(name)}_{_normalize(email)}.json"
@@ -25,9 +29,7 @@ async def get_assessment_details(name: str, email: str) -> dict:
     return rec.get("assessment", {})
 
 
-@function_tool(
-    description="Check assessment status (done, pending, dispositioned)."
-)
+@function_tool(description="Check assessment status (done, pending, dispositioned).")
 async def check_assessment_status(name: str, email: str) -> dict:
     rec = _load_candidate_record(name, email)
     if not rec:
@@ -37,15 +39,11 @@ async def check_assessment_status(name: str, email: str) -> dict:
         return {"error": "No assessment found"}
     return {
         "status": a.get("status"),
-        "deadline": a.get("deadline"),
-        "submitted_at": a.get("submitted_at"),
-        "score": a.get("score"),
+        "title": a.get("title"),
     }
 
 
-@function_tool(
-    description="Reschedule candidate assessment. Returns new deadline."
-)
+@function_tool(description="Reschedule candidate assessment. Returns new deadline.")
 async def reschedule_assessment(name: str, email: str, new_time: str) -> dict:
     rec = _load_candidate_record(name, email)
     if not rec:
@@ -57,9 +55,7 @@ async def reschedule_assessment(name: str, email: str, new_time: str) -> dict:
     return {"success": True, "new_deadline": new_time}
 
 
-@function_tool(
-    description="Send a reminder about the assessment."
-)
+@function_tool(description="Send a reminder about the assessment.")
 async def send_assessment_reminder(name: str, email: str) -> dict:
     rec = _load_candidate_record(name, email)
     if not rec:
@@ -70,13 +66,13 @@ async def send_assessment_reminder(name: str, email: str) -> dict:
     return {"success": True, "message": f"Reminder sent for {a['title']}"}
 
 
-@function_tool(
-    description="Escalate issue to recruiter/assessment team."
-)
+@function_tool(description="Escalate issue to recruiter/assessment team.")
 async def escalate_to_assessment_team(name: str, email: str, issue: str) -> dict:
     return {"success": True, "escalated_issue": issue}
 
+
 from livekit.agents import function_tool
+
 
 @function_tool(
     description="Get the candidate’s assessment result (traffic light model: Green, Yellow, Orange, Red)."
