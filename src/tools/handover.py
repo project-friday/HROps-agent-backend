@@ -38,7 +38,7 @@ async def handover_to_applications(
 
 
 @function_tool
-async def go_assessment(self, context: RunContext[dict]):
+async def go_assessment(context: RunContext[dict]):
     from src.agents.assessment import AssessmentAgent  # local import avoids cycles
 
     agent = context.session.current_agent
