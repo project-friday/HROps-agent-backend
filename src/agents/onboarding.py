@@ -11,7 +11,7 @@ from livekit.agents import ChatContext, llm
 from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import assemblyai, elevenlabs, openai, silero
 
-from src.tools.handover import go_assessment, handover_to_applications
+from src.tools.handover import get_handover_tools
 from src.tools.onboarding_agent import (
     check_offer_status,
     confirm_joining_date,
@@ -47,6 +47,8 @@ ONBOARDING_PROMPT = load_prompt("src/prompts/onboarding.txt")
 class OnboardingAgent(Agent):
     def __init__(self, room: rtc.Room, chat_ctx=None):
         self.room = room
+        handover_tools = get_handover_tools("onboarding")
+
         super().__init__(
             instructions=ONBOARDING_PROMPT,
             stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
@@ -73,12 +75,11 @@ class OnboardingAgent(Agent):
                 send_onboarding_summary,
                 get_it_assets,
                 get_day1_agenda,
-                handover_to_applications,
                 get_background_verification_status,
                 log_negotiation,
                 escalate_to_onboarding_team,
-                go_assessment,
-            ],
+            ]
+            + handover_tools,
         )
 
         # --- Action mapping for websocket updates ---

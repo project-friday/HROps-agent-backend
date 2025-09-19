@@ -6,8 +6,13 @@ from livekit import rtc
 from livekit.agents import Agent
 from livekit.plugins import elevenlabs, openai, silero
 
+from src.agents.assessment import AssessmentAgent
+from src.agents.job_application import JobApplicationAgent
+
+# At the top of router.py
+from src.agents.onboarding import OnboardingAgent
 from src.config.loader import get_cfg, render
-from src.tools.handover import go_applications, go_onboarding
+from src.tools.handover import get_handover_tools
 from src.utils.stt_config import make_deepgram_stt
 
 load_dotenv()
@@ -27,21 +32,24 @@ def build_router_config() -> tuple[str, list]:
     enabled = set(cfg["enabled_agents"])
 
     tools_lines = []
-    tools = []
+    tools = get_handover_tools("router")
 
     if "Applications" in enabled:
         tools_lines.append(
-            "- `go_applications` → application status/updates, application ID, job ID (JR-xxx), stages (submitted/in review/interview/selected/rejected) "
-            "OR General HR FAQs via the knowledge base (RAG)."
+            "- `go_applications` → application status/updates, application ID, job ID (JR-xxx), stages "
+            "(submitted/in review/interview/selected/rejected) OR General HR FAQs via the knowledge base (RAG)."
         )
-        tools.append(go_applications)
 
     if "Onboarding" in enabled:
         tools_lines.append(
             "- `go_onboarding` → offer letter, joining date/DOJ, pre-boarding, required documents, background check (BGV), "
             "reporting manager, location, workstation/laptop."
         )
-        tools.append(go_onboarding)
+
+    if "Assessments" in enabled:
+        tools_lines.append(
+            "- `go_assessment` → assessment related queries, issues and doubts"
+        )
 
     tools_snippet = (
         f"You are **Eve** from the {cfg.get('company_name', cfg['tenant'].title())} Talent Acquisition Team as the **router**. "

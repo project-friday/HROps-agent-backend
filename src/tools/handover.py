@@ -1,5 +1,7 @@
 from livekit.agents import RunContext, function_tool
 
+from src.config.loader import get_cfg
+
 
 @function_tool
 async def handover_to_onboarding(
@@ -63,3 +65,37 @@ async def go_assessment(context: RunContext[dict]):
 
     agent = context.session.current_agent
     return (AssessmentAgent(room=agent.room, chat_ctx=context.session._chat_ctx),)
+
+
+def get_handover_tools(agent: str) -> list:
+    """
+    Return a list of tools enabled for the tenant.
+
+    agent_type:
+        - "onboarding": OnboardingAgent, adds handover to Applications
+        - "applications": ApplicationsAgent, adds handover to Onboarding
+        - "router": Router, include all enabled tools
+    """
+    cfg = get_cfg()
+    enabled = set(cfg["enabled_agents"])
+    tools = []
+    print(f"Enabled agents: {enabled}")
+
+    if agent == "router":
+        if "Applications" in enabled:
+            tools.append(go_applications)
+        if "Onboarding" in enabled:
+            tools.append(go_onboarding)
+        if "Assessments" in enabled:
+            tools.append(go_assessment)
+    else:
+        # Agents: cross-handover + assessments
+        if "Assessments" in enabled:
+            tools.append(go_assessment)
+
+        if agent == "onboarding" and "Applications" in enabled:
+            tools.append(handover_to_applications)
+        elif agent == "applications" and "Onboarding" in enabled:
+            tools.append(handover_to_onboarding)
+
+    return tools

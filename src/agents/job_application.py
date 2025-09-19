@@ -17,7 +17,7 @@ from livekit.agents import llm
 from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import assemblyai, elevenlabs, openai, silero
 
-from src.tools.handover import go_assessment, handover_to_onboarding
+from src.tools.handover import get_handover_tools
 
 # ---- import the REAL tools directly ----
 from src.tools.job_application_agent import (
@@ -58,6 +58,7 @@ class JobApplicationAgent(Agent):
 
     def __init__(self, room: rtc.Room, chat_ctx=None) -> None:
         self.room = room
+        handover_tools = get_handover_tools(agent="applications")
         super().__init__(
             instructions=EVE_SYSTEM_PROMPT,
             # stt=assemblyai.STT(),
@@ -86,11 +87,10 @@ class JobApplicationAgent(Agent):
                 get_upcoming_interview,
                 check_interview_availability,
                 reschedule_interview,
-                handover_to_onboarding,
                 escalate_to_hiring_team,
                 email_conversation_summary,
-                go_assessment,
-            ],
+            ]
+            + handover_tools,
         )
 
         # Map action names to functions (used in websocket messages)
@@ -102,7 +102,6 @@ class JobApplicationAgent(Agent):
             "Fetching Interview Details": get_upcoming_interview,
             "Checking Interview Availability": check_interview_availability,
             "Rescheduling Interview": reschedule_interview,
-            "Processing Request": handover_to_onboarding,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
         self.tool_result_filters = {
@@ -128,7 +127,6 @@ class JobApplicationAgent(Agent):
             query_knowledge_base: "knowledge_base",
             check_interview_availability: "interview_availability",
             select_application_by_choice: "application_selection",
-            handover_to_onboarding: "handover",
         }
 
         self.visible_tools = {
