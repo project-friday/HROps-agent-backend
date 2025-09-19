@@ -1,32 +1,35 @@
-#______________________________________________________________________________________________#
+# ______________________________________________________________________________________________#
 # src/agents/job_application.py
 from __future__ import annotations
-from typing import AsyncGenerator,Dict, Any
-import logging
-from livekit.agents.voice import Agent,ModelSettings
-from livekit.plugins import openai, silero, assemblyai
-from livekit.plugins import elevenlabs
-from livekit.agents import llm
+
 import asyncio
-import aiofiles
 import json
+import logging
 from pathlib import Path
+from typing import Any, AsyncGenerator, Dict
+
+import aiofiles
+
 # from custom.livekit.plugins import murfai
 from dotenv import load_dotenv
 from livekit import rtc
-from src.tools.handover import handover_to_onboarding
+from livekit.agents import llm
+from livekit.agents.voice import Agent, ModelSettings
+from livekit.plugins import assemblyai, elevenlabs, openai, silero
+
+from src.tools.handover import go_assessment, handover_to_onboarding
+
 # ---- import the REAL tools directly ----
 from src.tools.job_application_agent import (
-    list_applications_by_email,
-    select_application_by_choice,
     check_application_status,
-    query_knowledge_base,
-    get_upcoming_interview,
     check_interview_availability,
-    reschedule_interview,
+    email_conversation_summary,
     escalate_to_hiring_team,
-    email_conversation_summary
-    
+    get_upcoming_interview,
+    list_applications_by_email,
+    query_knowledge_base,
+    reschedule_interview,
+    select_application_by_choice,
 )
 from src.utils.stt_config import make_deepgram_stt
 
@@ -36,10 +39,12 @@ load_dotenv()
 def load_prompt(file_path: str) -> str:
     return Path(file_path).read_text(encoding="utf-8").strip()
 
+
 logger = logging.getLogger("hr-eve-agent")
 logger.setLevel(logging.INFO)
 
-EVE_SYSTEM_PROMPT =load_prompt("src/prompts/job_application.txt")
+EVE_SYSTEM_PROMPT = load_prompt("src/prompts/job_application.txt")
+
 
 class JobApplicationAgent(Agent):
     """
@@ -51,8 +56,8 @@ class JobApplicationAgent(Agent):
     - Status-only answer; keep details for follow-ups
     """
 
-    def __init__(self,room:rtc.Room,chat_ctx=None) -> None:
-        self.room=room
+    def __init__(self, room: rtc.Room, chat_ctx=None) -> None:
+        self.room = room
         super().__init__(
             instructions=EVE_SYSTEM_PROMPT,
             # stt=assemblyai.STT(),
@@ -63,7 +68,7 @@ class JobApplicationAgent(Agent):
             #     language="en",          # force English
             #     detect_language=False   # disable auto language detection
             # ),
-            llm=openai.LLM(model="gpt-4.1",temperature=0.1),
+            llm=openai.LLM(model="gpt-4.1", temperature=0.1),
             # tts=openai.TTS(model="gpt-4o-mini-tts", voice="shimmer"),
             tts=elevenlabs.TTS(
                 # voice_id="wlmwDR77ptH6bKHZui0l",
@@ -80,10 +85,11 @@ class JobApplicationAgent(Agent):
                 query_knowledge_base,
                 get_upcoming_interview,
                 check_interview_availability,
-                reschedule_interview, 
+                reschedule_interview,
                 handover_to_onboarding,
                 escalate_to_hiring_team,
-                email_conversation_summary
+                email_conversation_summary,
+                go_assessment,
             ],
         )
 
@@ -101,8 +107,15 @@ class JobApplicationAgent(Agent):
         self.function_to_action = {v: k for k, v in self.actions.items()}
         self.tool_result_filters = {
             list_applications_by_email: ["email"],
-            check_application_status: ["email", "phone","human_status","updated_at_human","reschedules","found"],
-            get_upcoming_interview: ["has_interview","application_id"],
+            check_application_status: [
+                "email",
+                "phone",
+                "human_status",
+                "updated_at_human",
+                "reschedules",
+                "found",
+            ],
+            get_upcoming_interview: ["has_interview", "application_id"],
             reschedule_interview: ["reschedule_args"],
         }
 
@@ -125,7 +138,9 @@ class JobApplicationAgent(Agent):
             reschedule_interview,
         }
 
-    async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None, tool_func=None):
+    async def _send_websocket_message(
+        self, action: str, result: Dict[str, Any] = None, tool_func=None
+    ):
         """Send WebSocket message with action, filtered result, and card_name."""
         message = {"action": action}
 
@@ -139,8 +154,7 @@ class JobApplicationAgent(Agent):
 
         try:
             await self.room.local_participant.send_text(
-                json.dumps(message),
-                topic="lk.transcription"
+                json.dumps(message), topic="lk.transcription"
             )
             print(f"✅ Sent WebSocket message: {message}")
         except Exception as e:
@@ -192,7 +206,9 @@ class JobApplicationAgent(Agent):
                                 try:
                                     tool_args = json.loads(tool_args)
                                 except json.JSONDecodeError:
-                                    print(f"⚠️ Invalid JSON for {tool_name}: {tool_args}")
+                                    print(
+                                        f"⚠️ Invalid JSON for {tool_name}: {tool_args}"
+                                    )
                                     tool_args = {}
 
                             tool_function = None
@@ -208,7 +224,9 @@ class JobApplicationAgent(Agent):
                                 await self._send_websocket_message(action_name)
 
                                 # Queue tool execution after LLM finishes
-                                pending_tools.append((action_name, tool_function, tool_args))
+                                pending_tools.append(
+                                    (action_name, tool_function, tool_args)
+                                )
 
                 yield chunk
 
@@ -228,17 +246,20 @@ class JobApplicationAgent(Agent):
                 else:
                     result = tool_function(**tool_args)
 
-                await self._send_websocket_message(action_name, result, tool_func=tool_function)
+                await self._send_websocket_message(
+                    action_name, result, tool_func=tool_function
+                )
                 print(f"✅ Sent result for {action_name}: {result}")
 
             except Exception as e:
-                await self._send_websocket_message(action_name, {"error": str(e)}, tool_func=tool_function)
+                await self._send_websocket_message(
+                    action_name, {"error": str(e)}, tool_func=tool_function
+                )
                 print(f"❌ Tool execution failed for {action_name}: {e}")
 
     # --- speaks immediately after the agent becomes active (e.g., after handover) ---
     async def on_enter(self):
-        await self.session.generate_reply(
-        )
+        await self.session.generate_reply()
 
 
-#______________________________________________________________________________________________#
+# ______________________________________________________________________________________________#
