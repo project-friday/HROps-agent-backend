@@ -11,9 +11,12 @@ async def translate_to_english(text: str) -> str:
     """
 
     response = await client.chat.completions.create(
-        model="gpt-4o-mini",  # or another model
+        model="gpt-5-nano-2025-08-07",  # or another model
         messages=[
-            {"role": "system", "content": "You are a translation assistant."},
+            {
+                "role": "system",
+                "content": "You are a translation assistant. Only transate the text, just output the translation of text given to you",
+            },
             {"role": "user", "content": f"Translate this into English: {text}"},
         ],
     )
