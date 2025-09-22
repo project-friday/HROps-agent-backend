@@ -56,8 +56,9 @@ class AssessmentAgent(Agent):
             stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
             llm=openai.LLM(model="gpt-4.1", temperature=0.1),
             tts=elevenlabs.TTS(
-                voice_id="H8bdWZHK2OgZwTN7ponr",
+                voice_id="kjHz50TasdqbpbfK4uaN",
                 model="eleven_turbo_v2_5",
+                language="es",
             ),
             vad=silero.VAD.load(min_speech_duration=0.1),
             chat_ctx=chat_ctx,
