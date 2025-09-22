@@ -11,6 +11,7 @@ from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import deepgram, elevenlabs, openai, silero
 
+from src.agents.assessment import AssessmentAgent
 from src.agents.job_application import JobApplicationAgent
 from src.agents.onboarding import OnboardingAgent
 from src.utils.translator import translate_to_english
@@ -45,18 +46,22 @@ class RouterAgent(Agent):
 
     # ... existing init
     async def _translate_and_send_llm_response(
-        self, raw_response: str, role: str
+        self, raw_response: str, role: str, translate=True
     ) -> None:
         """
         Translate the final LLM response to English and send it to the WebSocket.
         Falls back to the raw response if translation fails.
         """
-        try:
-            translated_text = await translate_to_english(text=raw_response)
-            print("🌍 Translated to English:", translated_text)
-        except Exception as e:
-            print(f"⚠️ Translation failed, sending raw text: {e}")
+        if translate:
+            try:
+                translated_text = await translate_to_english(text=raw_response)
+                print("🌍 Translated to English:", translated_text)
+            except Exception as e:
+                print(f"⚠️ Translation failed, sending raw text: {e}")
+                translated_text = raw_response
+        else:
             translated_text = raw_response
+            print("🌍 Translation skipped, using raw text.")
 
         # 📤 Forward translated response to WebSocket
         try:
@@ -103,11 +108,11 @@ class RouterAgent(Agent):
                         if event.alternatives:
                             transcript = event.alternatives[0].text
                             print(f"📝 Final transcript: {transcript}")
-
-                            # 📤 Forward finalized transcript to WebSocket
-                            await self._translate_and_send_llm_response(
-                                transcript, "user"
-                            )
+                            if transcript or transcript != "":
+                                # 📤 Forward finalized transcript to WebSocket
+                                await self._translate_and_send_llm_response(
+                                    transcript, "user"
+                                )
 
                     # Always yield back into agent pipeline
                     yield event
@@ -151,8 +156,8 @@ class RouterAgent(Agent):
 
         # Capture final LLM response
         raw_response = "".join(buffer).strip()
-        print("✅ Full LLM response captured:", raw_response)
-        await self._translate_and_send_llm_response(raw_response, "bot")
+        if raw_response:
+            await self._translate_and_send_llm_response(raw_response, "bot")
 
     @function_tool
     async def go_onboarding(self, context: RunContext[dict]):
@@ -167,14 +172,20 @@ class RouterAgent(Agent):
             JobApplicationAgent(room=agent.room, chat_ctx=context.session._chat_ctx),
         )
 
+    @function_tool
+    async def go_assessment(self, context: RunContext[dict]):
+        agent = context.session.current_agent
+        return (AssessmentAgent(room=agent.room, chat_ctx=context.session._chat_ctx),)
+
     # --- speaks immediately after the router becomes active ---
     async def on_enter(self):
         await self.session.say(
             "Hola, soy Eve, del equipo de Adquisición de Talento de Walmart. ¿En qué puedo ayudarte?"
         )
         await self._translate_and_send_llm_response(
-            "Hello, I’m Eve from Walmart’s Talent Acquisition team. How can I help you?",
+            "Hello, I am Eve from Walmart's Talent Acquisition team. How can I help you?",
             "bot",
+            translate=False,
         )
 
 

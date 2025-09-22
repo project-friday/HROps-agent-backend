@@ -308,9 +308,10 @@ class OnboardingAgent(Agent):
                 yield chunk
 
         # Final LLM response
-        llm_response = "".join(buffer).strip()
-        print("✅ Full LLM response captured:", llm_response)
-        await self._translate_and_send_llm_response(llm_response, "bot")
+        raw_response = "".join(buffer).strip()
+        print("✅ Full LLM response captured:", raw_response)
+        if raw_response:
+            await self._translate_and_send_llm_response(raw_response, "bot")
 
         # Execute queued tools (only visible ones)
         for action_name, tool_function, tool_args in pending_tools:
