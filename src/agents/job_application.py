@@ -208,8 +208,10 @@ class JobApplicationAgent(Agent):
         )
         # print("🧑‍💻 Last user message:", last_user_msg.text_content if last_user_msg else "None")
         if last_user_msg and last_user_msg.text_content:
-            await self._translate_and_send_llm_response(
-                last_user_msg.text_content, "user"
+            asyncio.create_task(
+                self._translate_and_send_llm_response(
+                    last_user_msg.text_content, "user"
+                )
             )
 
         async with activity_llm.chat(
@@ -267,7 +269,9 @@ class JobApplicationAgent(Agent):
         raw_response = "".join(buffer).strip()
         print("✅ Full LLM response captured:", raw_response)
         if raw_response:
-            await self._translate_and_send_llm_response(raw_response, "bot")
+            asyncio.create_task(
+                self._translate_and_send_llm_response(raw_response, "bot")
+            )
 
         # Execute queued tools and send results
         for action_name, tool_function, tool_args in pending_tools:

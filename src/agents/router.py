@@ -73,7 +73,6 @@ class RouterAgent(Agent):
         except Exception as e:
             print(f"⚠️ Failed to forward translated response: {e}")
 
-
     async def llm_node(
         self,
         chat_ctx: llm.ChatContext,
@@ -94,12 +93,20 @@ class RouterAgent(Agent):
         pending_tools: list[tuple[str, callable, dict]] = []
         # --- Send the last user message first ---
         last_user_msg = next(
-            (item for item in reversed(chat_ctx.items) if item.type == "message" and item.role == "user"),
+            (
+                item
+                for item in reversed(chat_ctx.items)
+                if item.type == "message" and item.role == "user"
+            ),
             None,
-        ) 
-        print("🧑‍💻 Last user message:", last_user_msg.text_content if last_user_msg else "None")
+        )
         if last_user_msg and last_user_msg.text_content:
-            await self._translate_and_send_llm_response(last_user_msg.text_content, "user", translate=False)
+            asyncio.create_task(
+                self._translate_and_send_llm_response(
+                    last_user_msg.text_content, "user"
+                )
+            )
+
         async with activity_llm.chat(
             chat_ctx=chat_ctx,
             tools=tools,
@@ -119,7 +126,9 @@ class RouterAgent(Agent):
         # Capture final LLM response
         raw_response = "".join(buffer).strip()
         if raw_response:
-            await self._translate_and_send_llm_response(raw_response, "bot")
+            asyncio.create_task(
+                self._translate_and_send_llm_response(raw_response, "bot")
+            )
 
     @function_tool
     async def go_onboarding(self, context: RunContext[dict]):
