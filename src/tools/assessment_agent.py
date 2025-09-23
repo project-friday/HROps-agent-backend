@@ -68,6 +68,9 @@ async def send_assessment_reminder(name: str, email: str) -> dict:
 
 @function_tool(description="Escalate issue to recruiter/assessment team.")
 async def escalate_to_assessment_team(name: str, email: str, issue: str) -> dict:
+    rec = _load_candidate_record(name, email)
+    if not rec:
+        return {"error": "No record found"}
     return {"success": True, "escalated_issue": issue}
 
 
