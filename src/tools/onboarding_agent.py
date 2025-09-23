@@ -111,8 +111,9 @@ async def get_preboarding_tasks(name: str, email: str) -> dict:
     if not rec:
         return {"error": "No record found"}
     return {"tasks": rec.get("preboarding", {}).get("tasks", [])}
+
 @function_tool(
-    description="Return the candidate's background verification (BGV) status, expected completion days, and remarks."
+    description=("Return the candidate's BGV status, ETA, and remarks; share link or dispute info only if the candidate explicitly raises those issues.")
 )
 async def get_background_verification_status(name: str, email: str) -> dict:
     rec = _load_candidate_record(name, email)
@@ -123,9 +124,10 @@ async def get_background_verification_status(name: str, email: str) -> dict:
     return {
         "status": bgv.get("status", "unknown"),
         "expected_days": bgv.get("expected_days", ""),
-        "remarks": bgv.get("remarks", "")
+        "remarks": bgv.get("remarks", ""),
+        "link": bgv.get("link", "Recruiter or store manager will share a new link if the candidate cannot access it."),
+        "dispute_info": bgv.get("dispute_info", "For dispute/disagreement, contact the Associate Vetting Team at 800-348-1931.")
     }
-
 
 
  # your SES email sender
