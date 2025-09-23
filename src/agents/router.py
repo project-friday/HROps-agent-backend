@@ -110,8 +110,10 @@ class RouterAgent(Agent):
                             print(f"📝 Final transcript: {transcript}")
                             if transcript or transcript != "":
                                 # 📤 Forward finalized transcript to WebSocket
-                                await self._translate_and_send_llm_response(
-                                    transcript, "user"
+                                asyncio.create_task(
+                                    self._translate_and_send_llm_response(
+                                        transcript, "user"
+                                    )
                                 )
 
                     # Always yield back into agent pipeline
@@ -157,7 +159,9 @@ class RouterAgent(Agent):
         # Capture final LLM response
         raw_response = "".join(buffer).strip()
         if raw_response:
-            await self._translate_and_send_llm_response(raw_response, "bot")
+            asyncio.create_task(
+                self._translate_and_send_llm_response(raw_response, "bot")
+            )
 
     @function_tool
     async def go_onboarding(self, context: RunContext[dict]):

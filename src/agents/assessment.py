@@ -192,8 +192,10 @@ class AssessmentAgent(Agent):
                             print(f"📝 Final transcript: {transcript}")
 
                             # 📤 Forward finalized transcript to WebSocket
-                            await self._translate_and_send_llm_response(
-                                transcript, "user"
+                            asyncio.create_task(
+                                self._translate_and_send_llm_response(
+                                    transcript, "user"
+                                )
                             )
 
                     # Always yield back into agent pipeline
@@ -272,7 +274,9 @@ class AssessmentAgent(Agent):
         raw_response = "".join(buffer).strip()
         print("✅ Full LLM response captured:", raw_response)
         if raw_response:
-            await self._translate_and_send_llm_response(raw_response, "bot")
+            asyncio.create_task(
+                self._translate_and_send_llm_response(raw_response, "bot")
+            )
         # print("✅ Full LLM response captured:", self.last_llm_response)
 
         # Execute queued tools and send results
