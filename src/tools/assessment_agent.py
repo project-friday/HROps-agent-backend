@@ -31,14 +31,22 @@ async def get_assessment_details(name: str, email: str) -> dict:
 
 @function_tool(description="Check assessment status (done, pending, dispositioned).")
 async def check_assessment_status(name: str, email: str) -> dict:
+    def _format_status(status: str) -> str:
+        """Normalize status: lowercase and replace spaces with underscores."""
+        if not status:
+            return status
+        return status.lower().replace(" ", "_")
+
     rec = _load_candidate_record(name, email)
     if not rec:
         return {"error": "No record found"}
+
     a = rec.get("assessment")
     if not a:
         return {"error": "No assessment found"}
+
     return {
-        "status": a.get("status"),
+        "status": _format_status(a.get("status")),
         "title": a.get("title"),
     }
 
@@ -68,6 +76,9 @@ async def send_assessment_reminder(name: str, email: str) -> dict:
 
 @function_tool(description="Escalate issue to recruiter/assessment team.")
 async def escalate_to_assessment_team(name: str, email: str, issue: str) -> dict:
+    rec = _load_candidate_record(name, email)
+    if not rec:
+        return {"error": "No record found"}
     return {"success": True, "escalated_issue": issue}
 
 

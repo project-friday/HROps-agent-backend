@@ -25,6 +25,14 @@ EMAIL_KEYTERMS = [
     "icloud.com","i cloud dot com",
 ]
 
+NAME_KEYTERMS = [
+    "Rajdeep","Hashif","Samyak","Ravi", "Sujon", "Hrashal","Naman",
+    "John","Emily","Michael","Sarah","Priya","Riya",
+    "singh","patil","doe","smith","johnson","wilson", "sekh"
+]
+
+KEYTERMS = EMAIL_KEYTERMS + NAME_KEYTERMS
+
 def make_deepgram_stt(language: str = "en-US", endpointing_ms: int = 200):
     """
     language: use "en-IN" for Indian English or "en-US" for US speakers
@@ -33,7 +41,7 @@ def make_deepgram_stt(language: str = "en-US", endpointing_ms: int = 200):
     return deepgram.STT(
         model="nova-3",
         language=language,
-        keyterms=EMAIL_KEYTERMS,
+        keyterms=KEYTERMS,
         endpointing_ms=endpointing_ms,
         filler_words=True,
         smart_format=True,
