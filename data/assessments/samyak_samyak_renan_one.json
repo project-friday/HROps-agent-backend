@@ -1,0 +1,11 @@
+{
+  "name": "Samyak",
+  "email": "samyak@renan.one",
+  "assessment": {
+    "id": "assess_101",
+    "title": "Technical MCQ Test",
+    "status": "Awaiting Manager Review",
+    "deadline": "2025-09-20T18:00:00",
+    "submitted_at": "2025-09-15T10:00:00"
+  }
+}

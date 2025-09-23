@@ -1,0 +1,12 @@
+{
+  "name": "Sarah",
+  "email": "sarah.wilson@gmail.com",
+  "assessment": {
+    "id": "assess_304",
+    "title": "General Aptitude Test",
+    "status": "Completed",
+    "submitted_at": "2025-09-12T08:45:00",
+    "score": 41,
+    "result": "Red"
+  }
+}
