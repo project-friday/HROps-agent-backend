@@ -219,6 +219,19 @@ class AssessmentAgent(Agent):
 
         buffer: list[str] = []
         pending_tools: list[tuple[str, callable, dict]] = []
+        last_user_msg = next(
+            (
+                item
+                for item in reversed(chat_ctx.items)
+                if item.type == "message" and item.role == "user"
+            ),
+            None,
+        )
+        # print("🧑‍💻 Last user message:", last_user_msg.text_content if last_user_msg else "None")
+        if last_user_msg and last_user_msg.text_content:
+            await self._translate_and_send_llm_response(
+                last_user_msg.text_content, "user"
+            )
 
         async with activity_llm.chat(
             chat_ctx=chat_ctx,

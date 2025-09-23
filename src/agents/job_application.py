@@ -179,52 +179,6 @@ class JobApplicationAgent(Agent):
         except Exception as e:
             print(f"⚠️ Failed to forward translated response: {e}")
 
-    async def stt_node(
-        self,
-        audio: AsyncGenerator[rtc.AudioFrame, None],
-        model_settings: ModelSettings,
-    ) -> AsyncGenerator[stt.SpeechEvent, None]:
-        """Custom STT node that intercepts only finalized transcripts."""
-        print("🎤 Starting custom STT node...")
-        activity = self._get_activity_or_raise()
-        assert activity.stt is not None, "stt_node called but no STT node is available"
-
-        wrapped_stt = activity.stt
-        if not activity.stt.capabilities.streaming:
-            if not activity.vad:
-                raise RuntimeError(
-                    f"The STT ({activity.stt.label}) does not support streaming, add a VAD"
-                )
-            wrapped_stt = stt.StreamAdapter(stt=wrapped_stt, vad=activity.vad)
-
-        conn_options = activity.session.conn_options.stt_conn_options
-        async with wrapped_stt.stream(conn_options=conn_options) as stream:
-
-            @utils.log_exceptions()
-            async def _forward_input() -> None:
-                async for frame in audio:
-                    stream.push_frame(frame)
-
-            print("🎤 Launched audio forwarding task")
-            forward_task = asyncio.create_task(_forward_input())
-            try:
-                async for event in stream:
-
-                    if event.type == SpeechEventType.FINAL_TRANSCRIPT:
-                        if event.alternatives:
-                            transcript = event.alternatives[0].text
-                            print(f"📝 Final transcript: {transcript}")
-
-                            # 📤 Forward finalized transcript to WebSocket
-                            await self._translate_and_send_llm_response(
-                                transcript, "user"
-                            )
-
-                    # Always yield back into agent pipeline
-                    yield event
-            finally:
-                await utils.aio.cancel_and_wait(forward_task)
-
     async def llm_node(
         self,
         chat_ctx: llm.ChatContext,
@@ -243,6 +197,20 @@ class JobApplicationAgent(Agent):
 
         buffer: list[str] = []
         pending_tools: list[tuple[str, callable, dict]] = []
+
+        last_user_msg = next(
+            (
+                item
+                for item in reversed(chat_ctx.items)
+                if item.type == "message" and item.role == "user"
+            ),
+            None,
+        )
+        # print("🧑‍💻 Last user message:", last_user_msg.text_content if last_user_msg else "None")
+        if last_user_msg and last_user_msg.text_content:
+            await self._translate_and_send_llm_response(
+                last_user_msg.text_content, "user"
+            )
 
         async with activity_llm.chat(
             chat_ctx=chat_ctx,
