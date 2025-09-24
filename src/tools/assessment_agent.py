@@ -1,9 +1,10 @@
 import json
 import os
+from pathlib import Path
 
 from livekit.agents import function_tool
 
-DATA_PATH = "data/assesments"
+DATA_PATH = Path("data/assessments")
 
 
 def _normalize(s: str) -> str:
@@ -13,6 +14,7 @@ def _normalize(s: str) -> str:
 def _load_candidate_record(name: str, email: str) -> dict:
     fname = f"{_normalize(name)}_{_normalize(email)}.json"
     fpath = os.path.join(DATA_PATH, fname)
+    print(f"Loading candidate record from: {fpath}")
     if not os.path.exists(fpath):
         return None
     with open(fpath, "r") as f:

@@ -12,7 +12,7 @@ from livekit import rtc
 from livekit.agents import llm, stt, utils
 from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
-from livekit.plugins import elevenlabs, openai, silero
+from livekit.plugins import deepgram, elevenlabs, openai, silero
 
 # ---- Import assessment tools ----
 from src.tools.assessment_agent import (
@@ -53,7 +53,7 @@ class AssessmentAgent(Agent):
         self.room = room
         super().__init__(
             instructions=EVE_ASSESSMENT_PROMPT,
-            stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
+            stt=deepgram.STT(language="es"),
             llm=openai.LLM(model="gpt-4.1", temperature=0.1),
             tts=elevenlabs.TTS(
                 voice_id="kjHz50TasdqbpbfK4uaN",
