@@ -19,6 +19,10 @@ tenants:
       hindi:
         tts_voice: "H8bdWZHK2OgZwTN7ponr"
         placeholder: "Hindi"
+        language_code: hi            # for Deepgram/ElevenLabs
+
       spanish:
         tts_voice: "kjHz50TasdqbpbfK4uaN"
         placeholder: "Spanish"
+        language_code: es             # for Deepgram/ElevenLabs
+

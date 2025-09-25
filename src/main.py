@@ -32,7 +32,7 @@ async def entrypoint(ctx: JobContext):
         cfg = get_cfg()
 
         await session.start(
-            agent=TranslatorAgent(cfg),
+            agent=TranslatorAgent(cfg, ctx.room),
             room=ctx.room,
             room_input_options=room_io.RoomInputOptions(
                 noise_cancellation=noise_cancellation.BVC()
