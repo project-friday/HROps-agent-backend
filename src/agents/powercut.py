@@ -37,7 +37,7 @@ logger.setLevel(logging.INFO)
 class PowercutAgent(Agent):
     """
     Powercut assistant:
-    - Identifies customers (via UAC number or manual address)
+    - Identifies customers (via USC number or manual address)
     - Retrieves outage details using area code
     - Escalates to service scheduling if no outage detected
     """
