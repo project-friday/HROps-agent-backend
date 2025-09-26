@@ -2,16 +2,16 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict
+from typing import AsyncGenerator, AsyncIterable
 
 from dotenv import load_dotenv
 from livekit import rtc
-from livekit.agents import llm
+from livekit.agents import Agent, stt, tokenize, tts, utils
+from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
-from livekit.plugins import elevenlabs, openai, silero
+from livekit.plugins import elevenlabs, openai, silero, soniox
 
 from src.config.loader import get_cfg, render
 
@@ -22,7 +22,6 @@ from src.tools.powercut_agent import (
     get_outage_details,
     schedule_service,
 )
-from src.utils.stt_config import make_deepgram_stt
 
 load_dotenv()
 
@@ -47,18 +46,21 @@ class PowercutAgent(Agent):
         self.room = room
         self.cfg = get_cfg()
         prompt = load_prompt("src/prompts/powercut.txt")
-        POWERCUT_PROMPT = render(prompt, self.cfg)
+        self.prompt = render(prompt, self.cfg)
+        self.eleven_tts = elevenlabs.TTS(
+            voice_id="H8bdWZHK2OgZwTN7ponr",
+            model="eleven_turbo_v2_5",
+        )
+        self.openai_tts = openai.TTS(voice="shimmer")
+        self._user_language = "te"
 
         super().__init__(
-            instructions=POWERCUT_PROMPT,
-            stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
+            instructions=self.prompt,
+            stt=soniox.STT(params=soniox.STTOptions(language_hints=["en", "hi", "te"])),
             llm=openai.LLM(model="gpt-4.1", temperature=0.1),
-            tts=elevenlabs.TTS(
-                voice_id="H8bdWZHK2OgZwTN7ponr",
-                model="eleven_turbo_v2_5",
-            ),
             vad=silero.VAD.load(min_speech_duration=0.1),
             chat_ctx=chat_ctx,
+            tts=self.openai_tts,
             tools=[
                 get_customer_details,
                 get_outage_details,
@@ -67,140 +69,86 @@ class PowercutAgent(Agent):
             ],
         )
 
-        self.actions = {
-            "Getting Customer Details": get_customer_details,
-            "Getting Outage Details": get_outage_details,
-            "Getting Area Mapping": get_area_mapping,
-            "Scheduling Service": schedule_service,
-        }
-        self.function_to_action = {v: k for k, v in self.actions.items()}
-
-        self.tool_result_filters = {
-            get_customer_details: ["usc_number"],  # hide sensitive info
-            schedule_service: ["success"],
-        }
-
-        self.tool_cards = {
-            get_customer_details: "customer_details",
-            get_outage_details: "outage_details",
-            get_area_mapping: "area_mapping",
-            schedule_service: "service_schedule",
-        }
-
-        self.visible_tools = {
-            get_customer_details,
-            get_outage_details,
-            get_area_mapping,
-            schedule_service,
-        }
-
-    async def _send_websocket_message(
-        self, action: str, result: Dict[str, Any] = None, tool_func=None
-    ):
-        """Send WebSocket message with action, filtered result, and card_name."""
-        message = {"action": action}
-
-        if result is not None:
-            if tool_func in self.tool_result_filters:
-                for key in self.tool_result_filters[tool_func]:
-                    result.pop(key, None)
-
-            message["result"] = result
-            message["card_name"] = self.tool_cards.get(tool_func, "generic")
-
-        try:
-            await self.room.local_participant.send_text(
-                json.dumps(message), topic="lk.transcription"
-            )
-            print(f"✅ Sent WebSocket message: {message}")
-        except Exception as e:
-            print(f"❌ Failed to send WebSocket message: {e}")
-
-    async def llm_node(
+    async def stt_node(
         self,
-        chat_ctx: llm.ChatContext,
-        tools: list[llm.FunctionTool | llm.RawFunctionTool],
+        audio: AsyncGenerator[rtc.AudioFrame, None],
         model_settings: ModelSettings,
-    ) -> AsyncGenerator[llm.ChatChunk | str, None]:
-        """Custom LLM node that captures full response text."""
-
+    ) -> AsyncGenerator[stt.SpeechEvent, None]:
+        """Custom STT node that intercepts only finalized transcripts."""
+        print("🎤 Starting custom STT node...")
         activity = self._get_activity_or_raise()
-        assert activity.llm is not None
-        assert isinstance(activity.llm, llm.LLM)
+        assert activity.stt is not None, "stt_node called but no STT node is available"
 
-        tool_choice = model_settings.tool_choice if model_settings else llm.NOT_GIVEN
-        activity_llm = activity.llm
-        conn_options = activity.session.conn_options.llm_conn_options
+        wrapped_stt = activity.stt
+        if not activity.stt.capabilities.streaming:
+            if not activity.vad:
+                raise RuntimeError(
+                    f"The STT ({activity.stt.label}) does not support streaming, add a VAD"
+                )
+            wrapped_stt = stt.StreamAdapter(stt=wrapped_stt, vad=activity.vad)
 
-        buffer: list[str] = []
-        pending_tools: list[tuple[str, callable, dict]] = []
+        conn_options = activity.session.conn_options.stt_conn_options
+        async with wrapped_stt.stream(conn_options=conn_options) as stream:
 
-        async with activity_llm.chat(
-            chat_ctx=chat_ctx,
-            tools=tools,
-            tool_choice=tool_choice,
-            conn_options=conn_options,
-        ) as stream:
-            async for chunk in stream:
-                if isinstance(chunk, str):
-                    buffer.append(chunk)
-                    print("⚡ LLM str chunk:", chunk)
+            @utils.log_exceptions()
+            async def _forward_input() -> None:
+                async for frame in audio:
+                    stream.push_frame(frame)
 
-                elif isinstance(chunk, llm.ChatChunk):
-                    if chunk.delta and chunk.delta.content:
-                        buffer.append(chunk.delta.content)
-
-                    if chunk.delta and chunk.delta.tool_calls:
-                        print("🔧 Tool calls:", chunk.delta.tool_calls)
-
-                        for tool_call in chunk.delta.tool_calls:
-                            tool_name = tool_call.name
-                            tool_args = tool_call.arguments or "{}"
-
-                            if isinstance(tool_args, str):
-                                try:
-                                    tool_args = json.loads(tool_args)
-                                except json.JSONDecodeError:
-                                    print(
-                                        f"⚠️ Invalid JSON for {tool_name}: {tool_args}"
-                                    )
-                                    tool_args = {}
-
-                            tool_function = None
-                            action_name = None
-                            for name, func in self.actions.items():
-                                if func.__name__ == tool_name:
-                                    tool_function = func
-                                    action_name = name
-                                    break
-
-                            if tool_function and action_name:
-                                await self._send_websocket_message(action_name)
-                                pending_tools.append(
-                                    (action_name, tool_function, tool_args)
-                                )
-
-                yield chunk
-
-        self.last_llm_response = "".join(buffer).strip()
-
-        for action_name, tool_function, tool_args in pending_tools:
+            print("🎤 Launched audio forwarding task")
+            forward_task = asyncio.create_task(_forward_input())
             try:
-                if asyncio.iscoroutinefunction(tool_function):
-                    result = await tool_function(**tool_args)
-                else:
-                    result = tool_function(**tool_args)
+                async for event in stream:
 
-                await self._send_websocket_message(
-                    action_name, result, tool_func=tool_function
-                )
-                print(f"✅ Sent result for {action_name}: {result}")
+                    if event.type == SpeechEventType.FINAL_TRANSCRIPT:
+                        if event.alternatives:
+                            self._user_language = event.alternatives[0].language
 
-            except Exception as e:
-                await self._send_websocket_message(
-                    action_name, {"error": str(e)}, tool_func=tool_function
-                )
-                print(f"❌ Tool execution failed for {action_name}: {e}")
+                    # Always yield back into agent pipeline
+                    yield event
+            finally:
+                await utils.aio.cancel_and_wait(forward_task)
+
+    async def tts_node(
+        self,
+        text: AsyncIterable[str],
+        model_settings: ModelSettings,
+    ) -> AsyncGenerator[rtc.AudioFrame, None]:
+        """
+        Dynamically choose TTS engine based on last STT language.
+        Telugu -> OpenAI shimmer; others -> ElevenLabs.
+        """
+
+        # ---- Select TTS Engine ----
+        if self._user_language == "te":
+            chosen_tts = self.openai_tts
+        else:
+            chosen_tts = self.eleven_tts
+
+        # ---- Handle non-streaming TTS engines ----
+        wrapped_tts = chosen_tts
+        if not chosen_tts.capabilities.streaming:
+            wrapped_tts = tts.StreamAdapter(
+                tts=chosen_tts,
+                sentence_tokenizer=tokenize.blingfire.SentenceTokenizer(
+                    retain_format=True
+                ),
+            )
+
+        conn_options = self.session.conn_options.tts_conn_options
+        async with wrapped_tts.stream(conn_options=conn_options) as stream:
+
+            async def _forward_input() -> None:
+                async for chunk in text:
+                    stream.push_text(chunk)
+                stream.end_input()
+
+            forward_task = asyncio.create_task(_forward_input())
+            try:
+                async for ev in stream:
+                    yield ev.frame
+            finally:
+                await utils.aio.cancel_and_wait(forward_task)
 
     async def on_enter(self):
         cfg = get_cfg()
