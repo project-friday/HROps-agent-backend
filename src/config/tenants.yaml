@@ -29,3 +29,6 @@ tenants:
   powercut:
     company_name: "Power Department Telangana"
     greeting: "Hey there, I’m Madhavi, speaking from Power Department Telangana. How may I help you?"
+    flows:
+      default:
+        enabled_agents: ["Complaints", "Outage Reporting", "Billing"]

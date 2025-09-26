@@ -7,6 +7,7 @@ from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession, room_io
 from livekit.plugins import noise_cancellation
 
+from src.agents.powercut import PowercutAgent
 from src.agents.router import RouterAgent
 from src.agents.translator import TranslatorAgent
 from src.helpers.arg_parser import parse_cli_args
@@ -40,6 +41,15 @@ async def entrypoint(ctx: JobContext):
             room_output_options=room_io.RoomOutputOptions(
                 transcription_enabled=True, sync_transcription=True
             ),
+        )
+    elif tenant == "powercut":
+        print("Starting in powercut mode")
+        await session.start(
+            agent=PowercutAgent(room=ctx.room),
+            room_input_options=room_io.RoomInputOptions(
+                noise_cancellation=noise_cancellation.BVC()
+            ),
+            room=ctx.room,
         )
     else:
         print("Starting in router mode")
