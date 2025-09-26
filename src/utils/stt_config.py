@@ -61,11 +61,17 @@ EMAIL_KEYTERMS = [
     "icloud.com",
     "i cloud dot com",
 ]
+NAME_KEYTERMS = [
+    "Rajdeep","Hashif","Samyak","Ravi", "Sujon", "Hrashal","Naman",
+    "John","Emily","Michael","Sarah","Priya","Riya",
+    "singh","patil","doe","smith","johnson","wilson", "sekh"
+]
 
 
 def make_deepgram_stt(
     language: str = "en-US", endpointing_ms: int = 200, use_keyterms: bool = True
 ) -> deepgram.STT:
+
     """
     language: use "en-IN" for Indian English or "en-US" for US speakers
     endpointing_ms: ~250–350 is a good starting band to avoid mid-email cutoffs
@@ -79,6 +85,7 @@ def make_deepgram_stt(
     }
 
     if use_keyterms:
-        stt_kwargs["keyterms"] = EMAIL_KEYTERMS
+        stt_kwargs["keyterms"] = EMAIL_KEYTERMS + NAME_KEYTERMS
 
     return deepgram.STT(**stt_kwargs)
+

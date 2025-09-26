@@ -86,6 +86,8 @@ class AssessmentAgent(Agent):
             # reschedule_assessment: ["new_deadline"],
             get_assessment_details: ["instructions", "duration"],
             get_assessment_result: ["submitted_at"],
+            escalate_to_assessment_team: ["success"],
+            send_assessment_reminder: ["success"],
         }
 
         self.tool_cards = {
@@ -101,7 +103,6 @@ class AssessmentAgent(Agent):
             get_assessment_details,
             check_assessment_status,
             reschedule_assessment,
-            send_assessment_reminder,
             escalate_to_assessment_team,
             get_assessment_result,
         }

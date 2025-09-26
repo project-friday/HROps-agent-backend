@@ -112,17 +112,7 @@ async def get_preboarding_tasks(name: str, email: str) -> dict:
         return {"error": "No record found"}
     return {"tasks": rec.get("preboarding", {}).get("tasks", [])}
 @function_tool(
-    description=(
-        "Return the candidate's background verification (BGV) details: status, expected completion days, and remarks. "
-        "For status-only questions, reply concisely with just these fields (no extra guidance). "
-        "Show special handling info only when the user explicitly brings it up: "
-        "- If the candidate reports trouble accessing the verification link, respond empathetically, confirm that a request for a new link has been raised, and mention that the recruiter or store manager will share it within 24 hours. "
-        "- If the candidate directly asks for the new link, politely clarify that the agent is not allowed to share background verification links with candidates, and only the recruiter or store manager can provide a fresh one. "
-        "- If (and only if) the candidate disputes or disagrees with a failed verification, include the 'dispute_info' field. "
-        "When status is 'failed', begin with a brief empathetic opener (e.g., 'Sorry…', 'Unfortunately…', 'I can see…'). "
-        "Do not include dispute guidance in status-only replies unless the user expresses disagreement."
-    )
-
+    description=("Return the candidate's BGV status, ETA, and remarks; share link or dispute info only if the candidate explicitly raises those issues.")
 
 )
 async def get_background_verification_status(name: str, email: str) -> dict:
