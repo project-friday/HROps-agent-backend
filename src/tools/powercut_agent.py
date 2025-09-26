@@ -1,42 +1,57 @@
-# src/tools/powercut_agent.py
+import os, json, time
+from livekit.agents import function_tool
+
+BASE_DIR = "data/powercut"
+
+def _read_json(path: str):
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+def _write_json(path: str, data: dict):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
 
 
-async def get_customer_details(uac_number: str) -> dict:
-    """Fetch customer details by UAC number."""
-    # Mock response - replace with DB/API lookup
-    return {
-        "name": "Ramesh Kumar",
-        "age": 42,
-        "address": "123 Main Street, West Panchayat, Trichy",
-        "area_code": "TNY-045",
-    }
+@function_tool(description="Fetch customer details by USC (usc_number).")
+async def get_customer_details(usc_number: str) -> dict:
+    path = os.path.join(BASE_DIR, f"usc_{usc_number}.json")
+    data = _read_json(path)
+    if not data:
+        return {"found": False, "message": f"No customer found for USC {usc_number}"}
+    return data
 
 
+@function_tool(description="Return outage info for area_code.")
 async def get_outage_details(area_code: str) -> dict:
-    """Check outage info for a given area code."""
-    outages = {
-        "TNY-045": {"reason": "Transformer failure", "restoration_time": "2 hours"},
-        "CHN-101": {"reason": "Scheduled maintenance", "restoration_time": "5 PM"},
-    }
-    return outages.get(area_code, {"reason": None, "restoration_time": None})
+    path = os.path.join(BASE_DIR, f"outage_{area_code}.json")
+    data = _read_json(path)
+    if not data:
+        return {"area_code": area_code, "status": "No Outage"}
+    return data
 
 
+@function_tool(description="Infer area_code from address/district/panchayat.")
 async def get_area_mapping(district: str, panchayat: str, address: str) -> dict:
-    """Resolve district+panchayat+address → area code."""
-    # Mock mapping
-    if "trichy" in district.lower():
-        return {"area_code": "TNY-045"}
-    elif "chennai" in district.lower():
-        return {"area_code": "CHN-101"}
+    text = " ".join([district or "", panchayat or "", address or ""]).lower()
+    if "warangal" in text:
+        return {"area_code": "WGL-110"}
+    elif "hyderabad" in text:
+        return {"area_code": "HYD-209"}
     return {"area_code": "UNKNOWN"}
 
 
+@function_tool(description="Create service ticket for localized issue or hazard.")
 async def schedule_service(address: str, issue_description: str) -> dict:
-    """Schedule a service visit if no outage is found."""
-    return {
-        "success": True,
-        "ticket_id": "SRV-23910",
-        "scheduled_time": "Tomorrow 10 AM",
+    ticket_id = time.strftime("ticket_%Y-%m-%d_%H-%M-%S")
+    ticket = {
+        "ticket_id": ticket_id,
         "address": address,
-        "issue": issue_description,
+        "issue_description": issue_description,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "status": "Emergency" if "EMERGENCY" in issue_description.upper() else "Open"
     }
+    path = os.path.join(BASE_DIR, f"{ticket_id}.json")
+    _write_json(path, ticket)
+    return {"success": True, "ticket_id": ticket_id}
