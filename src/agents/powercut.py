@@ -13,6 +13,8 @@ from livekit.agents import llm
 from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import elevenlabs, openai, silero
 
+from src.config.loader import get_cfg, render
+
 # ---- Import powercut tools ----
 from src.tools.powercut_agent import (
     get_area_mapping,
@@ -32,8 +34,6 @@ def load_prompt(file_path: str) -> str:
 logger = logging.getLogger("hr-eve-powercut-agent")
 logger.setLevel(logging.INFO)
 
-EVE_POWERCUT_PROMPT = load_prompt("src/prompts/powercut.txt")
-
 
 class PowercutAgent(Agent):
     """
@@ -45,8 +45,12 @@ class PowercutAgent(Agent):
 
     def __init__(self, room: rtc.Room, chat_ctx=None) -> None:
         self.room = room
+        self.cfg = get_cfg()
+        prompt = load_prompt("src/prompts/powercut.txt")
+        POWERCUT_PROMPT = render(prompt, self.cfg)
+
         super().__init__(
-            instructions=EVE_POWERCUT_PROMPT,
+            instructions=POWERCUT_PROMPT,
             stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
             llm=openai.LLM(model="gpt-4.1", temperature=0.1),
             tts=elevenlabs.TTS(
@@ -199,4 +203,5 @@ class PowercutAgent(Agent):
                 print(f"❌ Tool execution failed for {action_name}: {e}")
 
     async def on_enter(self):
-        await self.session.generate_reply()
+        cfg = get_cfg()
+        await self.session.say(cfg["greeting"])

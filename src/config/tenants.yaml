@@ -26,3 +26,6 @@ tenants:
         placeholder: "Spanish"
         language_code: es             # for Deepgram/ElevenLabs
 
+  powercut:
+    company_name: "Power Department Telangana"
+    greeting: "Hey there, I’m Madhavi, speaking from Power Department Telangana. How may I help you?"
