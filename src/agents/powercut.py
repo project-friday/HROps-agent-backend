@@ -38,7 +38,7 @@ logger.setLevel(logging.INFO)
 class PowercutAgent(Agent):
     """
     Powercut assistant:
-    - Identifies customers (via UAC number or manual address)
+    - Identifies customers (via USC number or manual address)
     - Retrieves outage details using area code
     - Escalates to service scheduling if no outage detected
     """
@@ -76,7 +76,7 @@ class PowercutAgent(Agent):
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
         self.tool_result_filters = {
-            get_customer_details: ["uac_number"],  # hide sensitive info
+            get_customer_details: ["usc_number"],  # hide sensitive info
             schedule_service: ["success"],
         }
 
