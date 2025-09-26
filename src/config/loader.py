@@ -1,4 +1,3 @@
-# src/config/loader.py
 from __future__ import annotations
 
 import os
@@ -40,15 +39,25 @@ def get_cfg() -> dict:
 
     tenant_cfg = tenants[tenant]
 
-    # Merge tenant-level and flow-level enabled_agents
-    flow_cfg = tenant_cfg.get("flows", {}).get(flow, {})
-    enabled_agents = flow_cfg.get(
-        "enabled_agents",
-        tenant_cfg.get("enabled_agents", ["Applications", "Onboarding", "Assessment"]),
-    )
+    # --- ADDITION FOR TRANSLATOR TENANT ---
+    if tenant == "translator":
+        # Each flow key is a language (hindi/spanish)
+        flow_cfg = tenant_cfg.get("flows", {}).get(flow, {})
+        cfg = {"tenant": tenant, "flow": flow, **flow_cfg}
+        # Add enabled_agents if not present
+        cfg.setdefault("enabled_agents", ["Translator"])
+    else:
+        # Merge tenant-level and flow-level enabled_agents
+        flow_cfg = tenant_cfg.get("flows", {}).get(flow, {})
+        enabled_agents = flow_cfg.get(
+            "enabled_agents",
+            tenant_cfg.get(
+                "enabled_agents", ["Applications", "Onboarding", "Assessment"]
+            ),
+        )
 
-    cfg = {"tenant": tenant, "flow": flow, **tenant_cfg}
-    cfg["enabled_agents"] = enabled_agents
+        cfg = {"tenant": tenant, "flow": flow, **tenant_cfg}
+        cfg["enabled_agents"] = enabled_agents
 
     _CFG = cfg
     return _CFG
