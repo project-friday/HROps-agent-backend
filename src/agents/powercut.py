@@ -21,6 +21,7 @@ from src.tools.powercut_agent import (
     get_customer_details,
     get_outage_details,
     schedule_service,
+    send_sms,
 )
 
 load_dotenv()
@@ -72,6 +73,7 @@ class PowercutAgent(Agent):
             "Fetching Outage Details": get_outage_details,
             "Fetching Area Mapping": get_area_mapping,
             "Scheduling Service": schedule_service,
+            "Sending SMS": send_sms,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
@@ -86,6 +88,7 @@ class PowercutAgent(Agent):
             get_outage_details: "outage_status",
             get_area_mapping: "area_mapping",
             schedule_service: "service_schedule",
+            send_sms: "sms_notification",
         }
 
         # Mark which tools should send JSON updates
@@ -94,6 +97,7 @@ class PowercutAgent(Agent):
             get_outage_details,
             get_area_mapping,
             schedule_service,
+            send_sms,
         }
 
     async def _send_websocket_message(
