@@ -166,9 +166,19 @@ class PowercutAgent(Agent):
                     buffer.append(chunk)
                     print("🤖 LLM str chunk:", chunk)
 
+                    # 👀 Detect if USC is being requested
+                    if re.search(r"\bUSC\b", chunk, re.IGNORECASE):
+                        print("🔔 USC requested by agent")
+                        self._usc_requested = True
+
                 elif isinstance(chunk, llm.ChatChunk):
                     if chunk.delta and chunk.delta.content:
                         buffer.append(chunk.delta.content)
+
+                        # 👀 Detect if USC is being requested
+                        if re.search(r"\bUSC\b", chunk.delta.content, re.IGNORECASE):
+                            print("🔔 USC requested by agent")
+                            self._usc_requested = True
 
                     if chunk.delta and chunk.delta.tool_calls:
                         print("🛠️ Tool calls:", chunk.delta.tool_calls)
@@ -250,7 +260,7 @@ class PowercutAgent(Agent):
                 if len(candidate) == 10 and candidate.endswith("0"):
                     fixed = candidate[:-1]
                 else:
-                    fixed = candidate[:9]
+                    fixed = candidate
 
                 # ⚡ Clear buffer after processing a USC number
                 self._usc_buffer = ""
