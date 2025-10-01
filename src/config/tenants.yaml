@@ -17,12 +17,14 @@ tenants:
   translator:
     flows:
       hindi:
-        tts_voice: "H8bdWZHK2OgZwTN7ponr"
+        target_voice: "H8bdWZHK2OgZwTN7ponr"
         placeholder: "Hindi"
-        language_code: hi            # for Deepgram/ElevenLabs
+        language_code: hi
+        english_voice: "xctasy8XvGp2cVO9HL9k"            # for Deepgram/ElevenLabs
 
       spanish:
-        tts_voice: "kjHz50TasdqbpbfK4uaN"
+        target_voice: "tomkxGQGz4b1kE0EM722"
         placeholder: "Spanish"
-        language_code: es             # for Deepgram/ElevenLabs
+        language_code: es 
+        english_voice: "xctasy8XvGp2cVO9HL9k"           # for Deepgram/ElevenLabs
 
