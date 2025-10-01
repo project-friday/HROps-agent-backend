@@ -1,7 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict
+from typing import Any, AsyncGenerator, AsyncIterable, Dict
 
 from livekit import rtc
 from livekit.agents import (
@@ -13,6 +13,8 @@ from livekit.agents import (
     function_tool,
     llm,
     stt,
+    tokenize,
+    tts,
     utils,
 )
 from livekit.agents.llm import ChatContext
@@ -42,22 +44,29 @@ class TranslatorAgent(Agent):
                 "Add it to tenants.yaml under the flow."
             )
 
-        self._user_language = "en"  # default until detected
         # Load system prompt and replace placeholder with target language
         prompt_text = load_prompt("src/prompts/translator.txt")
         prompt_text = render(prompt_text, ctx=cfg)
         print(f"Translator prompt:\n{prompt_text}\n")
         self._user_language = "en"  # default user language
+        self.tts_english = elevenlabs.TTS(
+            voice_id=cfg["english_voice"],  # hardcoded English voice
+            model="eleven_turbo_v2_5",
+        )
+        self.tts_target = elevenlabs.TTS(
+            voice_id=cfg["target_voice"],  # target language voice from YAML
+            model="eleven_turbo_v2_5",
+        )
 
         # Initialize Agent
         super().__init__(
             instructions=prompt_text,
             stt=make_deepgram_stt(
-                language="multi", endpointing_ms=200, use_keyterms=False
+                language="multi", endpointing_ms=400, use_keyterms=False
             ),
             llm=openai.LLM(model="gpt-4.1", temperature=0.1),
             vad=silero.VAD.load(),
-            tts=elevenlabs.TTS(voice_id=cfg["tts_voice"], model="eleven_turbo_v2_5"),
+            tts=self.tts_english,  # default TTS, overridden in tts_node
         )
 
     def _get_response_language(self) -> str:
@@ -135,6 +144,42 @@ class TranslatorAgent(Agent):
 
                     # Always yield back into agent pipeline
                     yield event
+            finally:
+                await utils.aio.cancel_and_wait(forward_task)
+
+    async def tts_node(
+        self,
+        text: AsyncIterable[str],
+        model_settings: ModelSettings,
+    ) -> AsyncGenerator[rtc.AudioFrame, None]:
+        """
+        Choose TTS instance based on the language determined by _get_response_language().
+        """
+        response_lang = self._get_response_language()
+        chosen_tts = self.tts_english if response_lang == "en" else self.tts_target
+
+        # Wrap non-streaming TTS if necessary
+        wrapped_tts = chosen_tts
+        if not chosen_tts.capabilities.streaming:
+            wrapped_tts = tts.StreamAdapter(
+                tts=chosen_tts,
+                sentence_tokenizer=tokenize.blingfire.SentenceTokenizer(
+                    retain_format=True
+                ),
+            )
+
+        conn_options = self.session.conn_options.tts_conn_options
+        async with wrapped_tts.stream(conn_options=conn_options) as stream:
+
+            async def _forward_input() -> None:
+                async for chunk in text:
+                    stream.push_text(chunk)
+                stream.end_input()
+
+            forward_task = asyncio.create_task(_forward_input())
+            try:
+                async for ev in stream:
+                    yield ev.frame
             finally:
                 await utils.aio.cancel_and_wait(forward_task)
 
