@@ -106,7 +106,9 @@ class OnboardingAgent(Agent):
             get_offer_details: ["status", "loacation", "payroll", "benefits"],
             get_offer_summary: ["benefits"],
             get_documents_checklist: ["internal_ref"],
-            log_negotiation: ["raw_email"],  # avoid exposing internals
+            log_negotiation: ["raw_email"],
+            get_background_verification_status: ["remarks", "link", "dispute_info"],
+            # avoid exposing internals
         }
         self.email_tools = {
             log_negotiation,

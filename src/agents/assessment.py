@@ -84,10 +84,11 @@ class AssessmentAgent(Agent):
         self.tool_result_filters = {
             # check_assessment_status: ["status", "deadline", "submitted_at", "score"],
             # reschedule_assessment: ["new_deadline"],
-            get_assessment_details: ["instructions", "duration"],
+            get_assessment_details: ["instructions", "duration", "score", "result"],
             get_assessment_result: ["submitted_at"],
             escalate_to_assessment_team: ["success"],
             send_assessment_reminder: ["success"],
+            get_assessment_result: ["score", "result"],
         }
 
         self.tool_cards = {
@@ -104,7 +105,6 @@ class AssessmentAgent(Agent):
             check_assessment_status,
             reschedule_assessment,
             escalate_to_assessment_team,
-            get_assessment_result,
         }
 
     async def _send_websocket_message(
