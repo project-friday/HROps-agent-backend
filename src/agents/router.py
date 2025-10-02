@@ -184,10 +184,10 @@ class RouterAgent(Agent):
     # --- speaks immediately after the router becomes active ---
     async def on_enter(self):
         await self.session.say(
-            "Hola, soy Eve, del equipo de Adquisición de Talento de Walmart. ¿En qué puedo ayudarte?"
+            "Hola, soy Eve, del equipo de People Services. ¿En qué puedo ayudarte?"
         )
         await self._translate_and_send_llm_response(
-            "Hello, I am Eve from Walmart's Talent Acquisition team. How can I help you?",
+            "Hello, I am Eve from the People Services team. How can I help you?",
             "bot",
             translate=False,
         )
