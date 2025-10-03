@@ -13,7 +13,7 @@ from livekit import rtc
 from livekit.agents import llm, stt, tokenize, tts, utils
 from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
-from livekit.plugins import elevenlabs, openai, silero, soniox
+from livekit.plugins import azure, elevenlabs, google, openai, silero, soniox
 
 from src.config.loader import get_cfg, render
 
@@ -57,7 +57,16 @@ class PowercutAgent(Agent):
             voice_id="H8bdWZHK2OgZwTN7ponr",
             model="eleven_multilingual_v2",
         )
+        self.azure_tts = azure.TTS(
+            voice="te-IN-ShrutiNeural",
+        )
+        creds_path = Path("credentials.json")
+        with creds_path.open("r", encoding="utf-8") as f:
+            google_creds = json.load(f)
 
+        self.google_tts = google.TTS(
+            voice_name="te-IN-Chirp3-HD-Achernar", credentials_info=google_creds
+        )
         super().__init__(
             instructions=self.prompt,
             stt=soniox.STT(
@@ -71,7 +80,7 @@ class PowercutAgent(Agent):
             #     voice_id="H8bdWZHK2OgZwTN7ponr",
             #     model="eleven_multilingual_v2",
             # ),
-            tts=self.openai_tts,
+            tts=self.azure_tts,
             tools=[
                 get_customer_details,
                 get_outage_details,
@@ -349,7 +358,7 @@ class PowercutAgent(Agent):
 
         # ---- Select TTS Engine ----
         if self._user_language == "te":
-            chosen_tts = self.openai_tts
+            chosen_tts = self.azure_tts
         else:
             chosen_tts = self.eleven_tts
 
