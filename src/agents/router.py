@@ -76,7 +76,7 @@ class RouterAgent(Agent):
             llm=openai.LLM(model="gpt-4.1", temperature=0.1),
             vad=silero.VAD.load(),
             tts=elevenlabs.TTS(
-                voice_id="H8bdWZHK2OgZwTN7ponr",
+                voice_id="xctasy8XvGp2cVO9HL9k",
                 model="eleven_turbo_v2_5",
             ),
             chat_ctx=chat_ctx,

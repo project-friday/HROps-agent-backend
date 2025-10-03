@@ -73,7 +73,7 @@ class JobApplicationAgent(Agent):
             # tts=openai.TTS(model="gpt-4o-mini-tts", voice="shimmer"),
             tts=elevenlabs.TTS(
                 # voice_id="wlmwDR77ptH6bKHZui0l",
-                voice_id="H8bdWZHK2OgZwTN7ponr",
+                voice_id="xctasy8XvGp2cVO9HL9k",
                 # model="eleven_multilingual_v2",
                 model="eleven_turbo_v2_5",
             ),
