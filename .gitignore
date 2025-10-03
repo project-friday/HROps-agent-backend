@@ -11,3 +11,6 @@ venv/
 .env
 .env/
 /custom
+credentials.json
+.DS_Store
+test.py
