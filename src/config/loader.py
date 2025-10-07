@@ -14,6 +14,14 @@ _CFG = None
 _PLACEHOLDER = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
 
 
+import os
+from pathlib import Path
+
+import yaml
+
+_CFG = None  # Global cache
+
+
 def get_cfg() -> dict:
     """Load tenants.yaml once and return the active tenant+flow config."""
     global _CFG
@@ -26,9 +34,11 @@ def get_cfg() -> dict:
 
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
 
-    # Get tenant and flow from environment (set in main.py)
     tenant = os.getenv("TENANT_CLI_OVERRIDE", "walmart")
     flow = os.getenv("FLOW_CLI_OVERRIDE", "default")
+    lang = os.getenv("LANGUAGE_OVERRIDE", "english")
+    accent = os.getenv("ACCENT_OVERRIDE", "indian")
+
     print(f"Using tenant config: {tenant}, flow: {flow}")
 
     tenants = data.get("tenants", {})
@@ -38,26 +48,44 @@ def get_cfg() -> dict:
         )
 
     tenant_cfg = tenants[tenant]
+    flow_cfg = tenant_cfg.get("flows", {}).get(flow, {})
 
-    # --- ADDITION FOR TRANSLATOR TENANT ---
-    if tenant == "translator":
-        # Each flow key is a language (hindi/spanish)
-        flow_cfg = tenant_cfg.get("flows", {}).get(flow, {})
-        cfg = {"tenant": tenant, "flow": flow, **flow_cfg}
-        # Add enabled_agents if not present
-        cfg.setdefault("enabled_agents", ["Translator"])
-    else:
-        # Merge tenant-level and flow-level enabled_agents
-        flow_cfg = tenant_cfg.get("flows", {}).get(flow, {})
-        enabled_agents = flow_cfg.get(
-            "enabled_agents",
-            tenant_cfg.get(
-                "enabled_agents", ["Applications", "Onboarding", "Assessment"]
-            ),
+    # --- Merge tenant-level and flow-level ---
+    cfg = {**tenant_cfg, **flow_cfg}
+    cfg["tenant"] = tenant
+    cfg["flow"] = flow
+
+    # --- Merge enabled_agents safely ---
+    if "enabled_agents" not in cfg:
+        if tenant == "translator":
+            cfg["enabled_agents"] = ["Translator"]
+        else:
+            cfg["enabled_agents"] = ["Applications", "Onboarding", "Assessment"]
+
+    # --- Tenant-level LLM config ---
+    cfg["llm"] = tenant_cfg.get("llm", {"model": "gpt-4.1", "temperature": 0.1})
+
+    # --- Language-level STT/TTS config ---
+    language_cfg = tenant_cfg.get("language", {}).get(lang, {})
+    cfg["stt"] = language_cfg.get(
+        "stt", {"provider": "deepgram", "language_code": "en-US", "endpointing_ms": 200}
+    )
+    cfg["tts"] = language_cfg.get(
+        "tts", {"provider": "elevenlabs", "model": "eleven_turbo_v2_5"}
+    )
+
+    # --- Voice ID based on language+accent ---
+    cfg["voice_id"] = language_cfg.get("accent", {}).get(accent)
+    if not cfg["voice_id"]:
+        print(
+            f"Warning: No voice ID found for language '{lang}' and accent '{accent}' "
+            f"in tenant '{tenant}'."
         )
 
-        cfg = {"tenant": tenant, "flow": flow, **tenant_cfg}
-        cfg["enabled_agents"] = enabled_agents
+    cfg["language"] = lang
+    cfg["accent"] = accent
+
+    print(f"Using STT config:", cfg)
 
     _CFG = cfg
     return _CFG
