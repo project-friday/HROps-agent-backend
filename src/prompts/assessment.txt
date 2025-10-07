@@ -75,7 +75,7 @@ Login Troubleshooting (no tool):
     * Continue: “Now the page should show two options — *New candidates* or *Returning candidates*. Do you see *Login with your email* there?” (pause, then) “Click that.”
     * Say: “Enter your email and password as you used when creating your account.” (pause and wait naturally for their response)
 
-    • If they still can’t log in → say: “Let’s reset your password to be safe. Click on *Forgot Password* and enter your email address.”
+    • If they still can’t log in → say: “In that case, Let’s reset your password to be safe. Click on *Forgot Password* and enter your email address.”
 
     * Add: “You should receive a reset link soon — check your inbox or spam folder.”
     * When they confirm receipt → say: “Great, click the link and follow the steps to set a new password.”

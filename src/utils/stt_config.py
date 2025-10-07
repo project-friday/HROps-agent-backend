@@ -62,6 +62,7 @@ EMAIL_KEYTERMS = [
     "i cloud dot com",
 ]
 NAME_KEYTERMS = [
+    "Eve",
     "Rajdeep",
     "Hashif",
     "Samyak",
