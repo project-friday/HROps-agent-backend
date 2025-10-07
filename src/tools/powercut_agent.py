@@ -47,7 +47,23 @@ async def get_area_mapping(district: str, panchayat: str, address: str) -> dict:
     return {"area_code": "UNKNOWN"}
 
 
-@function_tool(description="Create service ticket for localized issue or hazard.")
+@function_tool(description="Create ticket for any issue reported by customer.")
+async def create_ticket(address: str, issue_description: str) -> dict:
+    ticket_id = time.strftime("ticket_%Y-%m-%d_%H-%M-%S")
+    ticket = {
+        "ticket_id": ticket_id,
+        "address": address,
+        "issue_description": issue_description,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "status": "Emergency" if "EMERGENCY" in issue_description.upper() else "Open",
+    }
+
+    return ticket
+
+
+@function_tool(
+    description="Schedule service visit for reported issue, for localised and hazardous issues."
+)
 async def schedule_service(address: str, issue_description: str) -> dict:
     ticket_id = time.strftime("ticket_%Y-%m-%d_%H-%M-%S")
     ticket = {
@@ -57,9 +73,7 @@ async def schedule_service(address: str, issue_description: str) -> dict:
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "status": "Emergency" if "EMERGENCY" in issue_description.upper() else "Open",
     }
-    path = os.path.join(BASE_DIR, f"{ticket_id}.json")
-    _write_json(path, ticket)
-    return {"success": True, "ticket_id": ticket_id}
+    return ticket
 
 
 @function_tool(description="Send SMS notification with ticket id and content.")

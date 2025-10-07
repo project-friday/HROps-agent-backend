@@ -19,6 +19,7 @@ from src.config.loader import get_cfg, render
 
 # ---- Import powercut tools ----
 from src.tools.powercut_agent import (
+    create_ticket,
     get_area_mapping,
     get_customer_details,
     get_outage_details,
@@ -87,6 +88,7 @@ class PowercutAgent(Agent):
                 get_area_mapping,
                 schedule_service,
                 send_sms,
+                create_ticket,
             ],
         )
 
@@ -97,12 +99,15 @@ class PowercutAgent(Agent):
             "Fetching Area Mapping": get_area_mapping,
             "Scheduling Service": schedule_service,
             "Sending SMS": send_sms,
+            "Creating Ticket": create_ticket,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
         # Optionally filter sensitive fields before sending over WS
         self.tool_result_filters = {
-            get_customer_details: ["phone", "email"],  # hide PII
+            get_customer_details: ["phone", "email"],
+            create_ticket: ["address", "issue_description"],
+            schedule_service: ["address", "issue_description"],  # hide PII
         }
 
         # 🎴 Map functions → card names for frontend rendering
@@ -112,6 +117,7 @@ class PowercutAgent(Agent):
             get_area_mapping: "area_mapping",
             schedule_service: "service_schedule",
             send_sms: "sms_notification",
+            create_ticket: "ticket_creation",
         }
 
         # Mark which tools should send JSON updates
@@ -121,6 +127,7 @@ class PowercutAgent(Agent):
             get_area_mapping,
             schedule_service,
             send_sms,
+            create_ticket,
         }
 
     async def _send_websocket_message(
