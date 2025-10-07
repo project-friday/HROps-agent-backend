@@ -14,8 +14,14 @@ def extract_arg(argv: List[str], flag: str, default: str) -> Tuple[str, List[str
     return default, argv
 
 
-def parse_cli_args(argv: List[str]) -> Tuple[str, str, List[str]]:
-    """Extract --tenant and --flow from argv, stripping them to avoid CLI conflicts."""
+def parse_cli_args(argv: List[str]) -> Tuple[str, str, str, str, List[str]]:
+    """
+    Extract --tenant, --flow, --language, and --accent from argv,
+    stripping them to avoid CLI conflicts.
+    """
     tenant, argv = extract_arg(argv, "--tenant", "walmart")
     flow, argv = extract_arg(argv, "--flow", "default")
-    return tenant, flow, argv
+    language, argv = extract_arg(argv, "--language", "english")
+    accent, argv = extract_arg(argv, "--accent", "indian")
+
+    return tenant, flow, language, accent, argv

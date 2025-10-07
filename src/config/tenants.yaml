@@ -2,18 +2,50 @@ tenants:
   hsbc:
     company_name: "HSBC"
     greeting: "Hey there, I’m Eve, speaking from HSBC Talent Acquisition Team. How may I help you?"
+    llm:
+      model: "gpt-4.1"
+      temperature: 0.1
     flows:
       default:
         enabled_agents: ["Applications", "Onboarding"]
+    language:
+      english:
+        stt:
+          provider: "deepgram"
+          language_code: "en-US"
+          endpointing_ms: 200
+        tts:
+          provider: "elevenlabs"
+          model: "eleven_turbo_v2_5"
+        accent:
+          indian: "H8bdWZHK2OgZwTN7ponr"
+          us: "xctasy8XvGp2cVO9HL9k"
 
   walmart:
     company_name: "Walmart"
     greeting: "Thank you for calling Walmart People Services, My name is Eve. How may I help you?"
+    llm:
+      model: "gpt-4.1"
+      temperature: 0.1
+
     flows:
       default:
         enabled_agents: ["Applications", "Assessments", "Onboarding"]
       lite:
         enabled_agents: ["Assessments", "Onboarding"]
+    language:
+      english:
+        stt:
+          provider: "deepgram"
+          language_code: "en-US"
+          endpointing_ms: 200
+        tts:
+          provider: "elevenlabs"
+          model: "eleven_turbo_v2_5"
+        accent:
+          indian: "H8bdWZHK2OgZwTN7ponr"
+          us: "xctasy8XvGp2cVO9HL9k"
+
   translator:
     flows:
       hindi:
