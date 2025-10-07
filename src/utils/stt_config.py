@@ -68,6 +68,7 @@ NAME_KEYTERMS = [
     "Ravi",
     "Sujon",
     "Harshal",
+    "Benjamin",
     "Naman",
     "John",
     "Emily",
@@ -92,6 +93,7 @@ NAME_KEYTERMS = [
     "wilson",
     "miller",
     "khetan",
+    "brooks",
 ]
 
 
