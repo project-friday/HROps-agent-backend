@@ -85,7 +85,7 @@ class AssessmentAgent(Agent):
             escalate_to_assessment_team: ["success"],
             send_assessment_reminder: ["success"],
             get_assessment_result: ["score", "result"],
-            create_case_record: ["success"],
+            create_case_record: ["success", "case_number"],
         }
 
         self.tool_cards = {

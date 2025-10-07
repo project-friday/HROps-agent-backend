@@ -31,6 +31,7 @@ from src.tools.onboarding_agent import (
     schedule_intro_call,
     send_onboarding_summary,
     update_shipping_address,
+    create_case_record,
 )
 from src.utils.stt_config import make_deepgram_stt
 
@@ -71,6 +72,7 @@ class OnboardingAgent(Agent):
                 get_background_verification_status,
                 log_negotiation,
                 escalate_to_onboarding_team,
+                create_case_record,
             ]
             + handover_tools,
         )
@@ -91,6 +93,7 @@ class OnboardingAgent(Agent):
             "Logging Negotiation": log_negotiation,
             "Notifying Onboarding Team": escalate_to_onboarding_team,
             "Submitting Deferral Request": mark_deferral,
+            "Creating Ticket" : create_case_record,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
@@ -101,6 +104,7 @@ class OnboardingAgent(Agent):
             get_documents_checklist: ["internal_ref"],
             log_negotiation: ["raw_email"],
             get_background_verification_status: ["remarks", "link", "dispute_info"],
+            create_case_record: ["success", "case_number"],
             # avoid exposing internals
         }
         self.email_tools = {
@@ -129,6 +133,7 @@ class OnboardingAgent(Agent):
             get_background_verification_status: "bgv_status",
             log_negotiation: "negotiation",
             escalate_to_onboarding_team: "escalation",
+            create_case_record: "case_record",
         }
 
         # --- Only some tools visible in UI ---
@@ -140,6 +145,7 @@ class OnboardingAgent(Agent):
             get_work_location,
             get_documents_checklist,
             get_background_verification_status,
+            create_case_record,
         }
 
     async def _send_websocket_message(

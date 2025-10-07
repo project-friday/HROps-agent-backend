@@ -30,6 +30,7 @@ from src.tools.job_application_agent import (
     query_knowledge_base,
     reschedule_interview,
     select_application_by_choice,
+    create_case_record,
 )
 from src.utils.stt_config import make_deepgram_stt
 
@@ -73,6 +74,7 @@ class JobApplicationAgent(Agent):
                 reschedule_interview,
                 escalate_to_hiring_team,
                 email_conversation_summary,
+                create_case_record,
             ]
             + handover_tools,
         )
@@ -86,6 +88,7 @@ class JobApplicationAgent(Agent):
             "Fetching Interview Details": get_upcoming_interview,
             "Checking Interview Availability": check_interview_availability,
             "Rescheduling Interview": reschedule_interview,
+            "Creating Ticket": create_case_record
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
         self.tool_result_filters = {
@@ -100,6 +103,7 @@ class JobApplicationAgent(Agent):
             ],
             get_upcoming_interview: ["has_interview", "application_id"],
             reschedule_interview: ["reschedule_args"],
+            create_case_record: ["success", "case_number"],
         }
 
         # 🎴 Card mapping for frontend
@@ -111,6 +115,7 @@ class JobApplicationAgent(Agent):
             query_knowledge_base: "knowledge_base",
             check_interview_availability: "interview_availability",
             select_application_by_choice: "application_selection",
+            create_case_record: "case_record",
         }
 
         self.visible_tools = {
@@ -118,6 +123,7 @@ class JobApplicationAgent(Agent):
             check_application_status,
             get_upcoming_interview,
             reschedule_interview,
+            create_case_record,
         }
 
     async def _send_websocket_message(
