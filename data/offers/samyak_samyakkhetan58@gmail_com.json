@@ -1,0 +1,104 @@
+{
+  "candidate": {
+    "name": "Samyak",
+    "email": "samyakkhetan58@gmail.com",
+    "phone": "+91 9636781558",
+    "application_id": "APP12345",
+    "role": "Data Engineer",
+    "level": "L2",
+    "location": "Bangalore Campus, Tower 3",
+    "work_model": "Hybrid (3 days onsite)"
+  },
+  "offer": {
+    "status": "sent",
+    "sent_date": "2025-10-17",
+    "acceptance_deadline": "2025-10-30",
+    "joining_date": "2025-11-15",
+    "probation": {
+      "duration_months": 3,
+      "notice_period_days": 30
+    },
+    "compensation": {
+      "base": "Rupees 10 lakh per annum",
+      "variable": {
+        "percentage": 10,
+        "frequency": "quarterly",
+        "criteria": "team + company goals"
+      }
+    },
+    "benefits": {
+      "insurance": "Health insurance Day-1 coverage, dependents can be added in 30 days",
+      "leaves": "20 paid leaves/year + public holidays",
+      "wfh_policy": "Hybrid, manager approval required for exceptions"
+    },
+    "payroll": {
+      "cycle": "monthly",
+      "payout_day": "last working day of the month"
+    }
+  },
+  "reporting": {
+    "manager_name": "Anita Sharma",
+    "manager_title": "Engineering Manager",
+    "manager_email": "anita.sharma@company.com",
+    "intro_call_scheduled": true,
+    "intro_call_date": "2025-10-20T11:15"
+  },
+  "preboarding": {
+    "tasks": [
+      "Offer acceptance",
+      "KYC & bank details",
+      "Tax declaration",
+      "Policy acknowledgement"
+    ],
+    "portal_link": "https://portal.company.com/preboarding",
+    "documents": {
+      "checklist": [
+        "Government ID (Passport/Aadhaar)",
+        "Highest education certificate",
+        "Last 3 months’ salary slips",
+        "Relieving/experience letters (if applicable)",
+        "PAN card"
+      ]
+    }
+  },
+  "it_assets": {
+    "laptop_shipping": "3-5 days post acceptance",
+    "email_provisioning": "48 hours before joining",
+    "vpn_access": "48 hours before joining",
+    "preferred_shipping_address": null,
+    "day1_agenda": {
+      "orientation": "10:00 AM Welcome Orientation",
+      "activities": [
+        "HR paperwork",
+        "IT setup",
+        "Team intro"
+      ]
+    }
+  },
+  "escalations": {
+    "offer_hold": {
+      "status": false,
+      "reason": null,
+      "eta": null
+    },
+    "joining_deferral": {
+      "requested": true,
+      "new_date": "2025-10-20"
+    },
+    "visa_support": {
+      "required": false,
+      "status": null
+    }
+  },
+  "bgv": {
+    "status": "pending",
+    "expected_days": "5-10",
+    "remarks": "Starts after offer acceptance and document upload"
+  },
+  "negotiations": [
+    {
+      "request": "Wants to negotiate on CTC.",
+      "timestamp": "2025-10-17T09:00:43.231703Z"
+    }
+  ]
+}
