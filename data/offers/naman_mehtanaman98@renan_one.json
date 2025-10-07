@@ -11,9 +11,9 @@
   },
   "offer": {
     "status": "accepted",
-    "sent_date": "2025-09-05",
-    "acceptance_date": "2025-09-08",
-    "joining_date": "2025-09-25",
+    "sent_date": "2025-10-17",
+    "acceptance_date": "2025-10-21",
+    "joining_date": "2025-11-10",
     "probation": {
       "duration_months": 6,
       "notice_period_days": 60
@@ -41,7 +41,7 @@
     "manager_title": "Senior Engineering Manager",
     "manager_email": "ravi.kumar@company.com",
     "intro_call_scheduled": true,
-    "intro_call_date": "2025-09-20T10:30"
+    "intro_call_date": "2025-10-24T10:30"
   },
   "preboarding": {
     "tasks": [
