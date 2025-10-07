@@ -21,6 +21,7 @@ from src.tools.assessment_agent import (
     get_assessment_result,
     reschedule_assessment,
     send_assessment_reminder,
+    create_case_record,
 )
 from src.utils.stt_config import make_deepgram_stt
 
@@ -59,6 +60,7 @@ class AssessmentAgent(Agent):
                 send_assessment_reminder,
                 escalate_to_assessment_team,
                 get_assessment_result,
+                create_case_record,
             ],
         )
 
@@ -68,8 +70,9 @@ class AssessmentAgent(Agent):
             "Checking Assessment Status": check_assessment_status,
             "Rescheduling Assessment": reschedule_assessment,
             "Sending Assessment Reminder": send_assessment_reminder,
-            "Escalating to Assessment Team": escalate_to_assessment_team,
+            "Creating Ticket": escalate_to_assessment_team,
             "Getting Assessment Result": get_assessment_result,
+            "Creating Ticket": create_case_record,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
@@ -82,6 +85,7 @@ class AssessmentAgent(Agent):
             escalate_to_assessment_team: ["success"],
             send_assessment_reminder: ["success"],
             get_assessment_result: ["score", "result"],
+            create_case_record: ["success", "case_number"],
         }
 
         self.tool_cards = {
@@ -91,6 +95,7 @@ class AssessmentAgent(Agent):
             send_assessment_reminder: "assessment_reminder",
             escalate_to_assessment_team: "assessment_escalation",
             get_assessment_result: "assessment_result",
+            create_case_record: "case_record",
         }
 
         self.visible_tools = {
@@ -98,6 +103,7 @@ class AssessmentAgent(Agent):
             check_assessment_status,
             reschedule_assessment,
             escalate_to_assessment_team,
+            create_case_record,
         }
 
     async def _send_websocket_message(

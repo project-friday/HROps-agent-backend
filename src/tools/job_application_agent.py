@@ -1,7 +1,7 @@
 # hr/tools/job_application_agent.py
 
 import re
-import json
+import json, random
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
@@ -139,6 +139,13 @@ def _suggest_alternatives(base_dt: datetime, tz_name: str, count: int = 2) -> li
     return alt
 
 # ---------- Tool: list all apps for an email (login + fan-out) ----------
+
+@function_tool(
+    description="Create a case number for the candidate issue or resolution."
+)
+async def create_case_record(name: str, email: str, issue_type: str) -> dict:
+    case_number = f"HRC{random.randint(10000000, 99999999)}"
+    return {"success": True, "case_number": case_number, "issue_type": issue_type}
 
 @function_tool(description="""
 Return the upcoming interview for an application, if any (scheduled or rescheduled in the future).

@@ -138,9 +138,9 @@ async def get_background_verification_status(name: str, email: str, last4_ssn: s
         "link": bgv.get("link", "Recruiter or store manager will share a new link if the candidate cannot access it."),
         "dispute_info": bgv.get("dispute_info", "For dispute/disagreement, contact the Associate Vetting Team at 800-348-1931.")
     }
-    if bgv.get("status", "").lower() == "failed":
-        case = await create_case_record(name, email, issue_type="Background verification failed")
-        result["case_number"] = case.get("case_number")
+    # if bgv.get("status", "").lower() == "failed":
+    #     case = await create_case_record(name, email, issue_type="Background verification failed")
+    #     result["case_number"] = case.get("case_number")
 
     return result
 
