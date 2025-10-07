@@ -8,7 +8,7 @@ tenants:
 
   walmart:
     company_name: "Walmart"
-    greeting: "Hey there, I’m Eve, speaking from Walmart People Service Team. How may I help you?"
+    greeting: "Thank you for calling Walmart People Services, My name is Eve. How may I help you?"
     flows:
       default:
         enabled_agents: ["Applications", "Assessments", "Onboarding"]
