@@ -51,13 +51,6 @@ class AssessmentAgent(Agent):
         self.room = room
         super().__init__(
             instructions=EVE_ASSESSMENT_PROMPT,
-            stt=make_deepgram_stt(language="en-US", endpointing_ms=200),
-            llm=openai.LLM(model="gpt-4.1", temperature=0.1),
-            tts=elevenlabs.TTS(
-                voice_id="xctasy8XvGp2cVO9HL9k",
-                model="eleven_turbo_v2_5",
-            ),
-            vad=silero.VAD.load(min_speech_duration=0.1),
             chat_ctx=chat_ctx,
             tools=[
                 get_assessment_details,
