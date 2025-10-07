@@ -2,6 +2,7 @@
   "candidate": {
     "name": "Harshal",
     "email": "patilharshal3558@gmail.com",
+    "phone": "+91 9593543219",
     "application_id": "APP12346",
     "role": "Backend Engineer",
     "level": "L2",
@@ -18,14 +19,12 @@
       "variable": "10%",
       "benefits": ["Health insurance", "ESOPs"],
       "location": "Bangalore",
-      "tentative_joining": "01 Oct 2025"
+      "tentative_joining": "2025-10-25"
     },
     "clarifications": {
       "compensation": "The variable is up to 10% of annual base, paid quarterly.",
       "probation": "Yes—3 months, all benefits apply, notice is 30 days.",
-      "deadline": "Please accept the offer by 15 Sep 2025."
+      "deadline": "Please accept the offer by 2025-10-17."
     }
   }
 }
-  
-

@@ -1,4 +1,4 @@
-import os, re, json
+import os, re, json, random
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from livekit.agents import function_tool
@@ -34,6 +34,12 @@ def _load_candidate_record(name: str, email: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+@function_tool(
+    description="Create a case number for the candidate issue or resolution."
+)
+async def create_case_record(name: str, email: str, issue_type: str) -> dict:
+    case_number = f"HRC{random.randint(10000000, 99999999)}"
+    return {"success": True, "case_number": case_number, "issue_type": issue_type}
 
 @function_tool(
     description="Check the offer status and ETA for sending the offer letter."
@@ -111,24 +117,32 @@ async def get_preboarding_tasks(name: str, email: str) -> dict:
     if not rec:
         return {"error": "No record found"}
     return {"tasks": rec.get("preboarding", {}).get("tasks", [])}
+
 @function_tool(
     description=("Return the candidate's BGV status, ETA, and remarks; share link or dispute info only if the candidate explicitly raises those issues.")
 
 )
-async def get_background_verification_status(name: str, email: str) -> dict:
+async def get_background_verification_status(name: str, email: str, last4_ssn: str) -> dict:
     rec = _load_candidate_record(name, email)
     if not rec:
         return {"error": "No record found"}
 
     bgv = rec.get("bgv", {})
-    return {
+    ssn = bgv.get("ssn", "").replace("-", "").strip()
+    if not ssn or not ssn.endswith(last4_ssn):
+        return {"error": "Invalid SSN provided"}
+    result = {
         "status": bgv.get("status", "unknown"),
         "expected_days": bgv.get("expected_days", ""),
         "remarks": bgv.get("remarks", ""),
         "link": bgv.get("link", "Recruiter or store manager will share a new link if the candidate cannot access it."),
         "dispute_info": bgv.get("dispute_info", "For dispute/disagreement, contact the Associate Vetting Team at 800-348-1931.")
     }
+    if bgv.get("status", "").lower() == "failed":
+        case = await create_case_record(name, email, issue_type="Background verification failed")
+        result["case_number"] = case.get("case_number")
 
+    return result
 
 
  # your SES email sender
@@ -184,8 +198,9 @@ async def mark_deferral(name: str, email: str, new_date: str, send: bool = True)
             "success": True,
             "message": "Deferral request submitted, but no hiring team email is configured.",
         }
+    case = await create_case_record(name, email, issue_type="joining_deferral_request")
 
-    return {"success": True, "status": "Deferral request submitted"}
+    return {"success": True, "status": "Deferral request submitted", "case_number": case.get("case_number"),}
 
 
 @function_tool(
@@ -210,7 +225,8 @@ async def schedule_intro_call(name: str, email: str, date: str) -> dict:
     data["reporting"]["intro_call_date"] = date
 
     fp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return {"success": True, "intro_call_date": date}
+    case = await create_case_record(name, email, issue_type="intro_call_scheduled")
+    return {"success": True, "intro_call_date": date, "case_number": case.get("case_number")}
 
 @function_tool(
     description="""
@@ -231,7 +247,8 @@ async def update_shipping_address(name: str, email: str, address: str) -> dict:
     data["it_assets"]["preferred_shipping_address"] = address
 
     fp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return {"success": True, "preferred_shipping_address": address}
+    case = await create_case_record(name, email, issue_type="shipping_address_update")
+    return {"success": True, "preferred_shipping_address": address, "case_number": case.get("case_number")}
 
 # async def update_joining_date(name: str, email: str, new_date: str) -> dict:
 #     """
@@ -307,11 +324,12 @@ async def log_negotiation(name: str, email: str, request: str, send: bool = True
             "success": True,
             "message": "Negotiation request submitted, but no compensation team email is configured.",
         }
-
+    case = await create_case_record(name, email, issue_type="negotiation_request")
     return {
         "success": True,
         "message": "Your request for negotiation has been shared with the onboarding team, thank you.",
-        "status":"email sent to compensation team"
+        "status":"email sent to compensation team",
+        "case_number": case.get("case_number")
     }
 
 
@@ -502,9 +520,10 @@ Please review this request and follow up with the candidate.
             "success": False,
             "message": "Escalation request captured, but no onboarding team email is configured.",
         }
-
+    case = await create_case_record(name, email, issue_type="escalation_request")
     return {
         "success": True,
         "message": "✅ I've shared your request with the onboarding team. They’ll follow up with you soon.",
-        "status":"email sent to onboarding team"
+        "status":"email sent to onboarding team",
+        "case_number": case.get("case_number")
     }
