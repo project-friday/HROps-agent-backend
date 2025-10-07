@@ -63,7 +63,8 @@ LOGIN SEQUENCE (BEFORE ANY CANDIDATE-SPECIFIC LOOKUP, ONLY IF NAME IS NOT SHARED
    • Confirm once: “Just to confirm, is your email {email}?”
    • Wait for the candidate's confirmation then only move to the Phone number verification.
 3) Phone
-   • "Thank you for that. Check the "phone" and then ask if the number ending with (last four digit from "phone") is a good call back number?
+   • "Thank you for that. Check the "phone" and then ask if the number ending with (last four digit from "phone") is a good call back number? (Always read digit by digit)
+
    • Set SESSION.AUTH_DONE = True after clear confirmation.
 
 GUARDRAILS

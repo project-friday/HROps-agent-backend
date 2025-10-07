@@ -68,7 +68,7 @@ class AssessmentAgent(Agent):
             "Checking Assessment Status": check_assessment_status,
             "Rescheduling Assessment": reschedule_assessment,
             "Sending Assessment Reminder": send_assessment_reminder,
-            "Escalating to Assessment Team": escalate_to_assessment_team,
+            "Creating Ticket": escalate_to_assessment_team,
             "Getting Assessment Result": get_assessment_result,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
