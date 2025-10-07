@@ -2,6 +2,7 @@
   "candidate": {
     "name": "Naman",
     "email": "mehtanaman98@renan.one",
+    "phone": "+91-9593248717",
     "application_id": "APP67890",
     "role": "Software Engineer",
     "level": "L1",
@@ -93,7 +94,8 @@
     "expected_days": "",
     "remarks": "Education verification has failed",
     "link_issue": "",
-    "dispute_info": "For dispute results, contact the Associate Vetting Team at 800-348-1931."
+    "dispute_info": "For dispute results, contact the Associate Vetting Team at 800-348-1931.",
+    "ssn": "406-22-7741"
   },
   "negotiations": []
 }
