@@ -13,8 +13,7 @@ from livekit import rtc
 from livekit.agents import llm, stt, tokenize, tts, utils
 from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
-from livekit.plugins import azure, elevenlabs, google, openai, silero, soniox
-
+from livekit.plugins import azure, elevenlabs, google, openai, silero, soniox, sarvam
 from src.config.loader import get_cfg, render
 
 # ---- Import powercut tools ----
@@ -67,6 +66,10 @@ class PowercutAgent(Agent):
 
         self.google_tts = google.TTS(
             voice_name="te-IN-Chirp3-HD-Achernar", credentials_info=google_creds
+        )
+        self.sarvam_tts = sarvam.TTS(
+            target_language_code="te-IN",
+            speaker="manisha",
         )
         super().__init__(
             instructions=self.prompt,
@@ -366,6 +369,25 @@ class PowercutAgent(Agent):
         # ---- Select TTS Engine ----
         if self._user_language == "te":
             chosen_tts = self.azure_tts
+        else:
+            chosen_tts = self.eleven_tts
+
+    async def tts_node(
+        self,
+        text: AsyncIterable[str],
+        model_settings: ModelSettings,
+    ) -> AsyncGenerator[rtc.AudioFrame, None]:
+        """
+        Dynamically choose TTS engine based on last STT language.
+        Telugu -> Sarvam Manisha
+        Hindi -> ElevenLabs
+        Others -> ElevenLabs
+        """
+
+        if self._user_language == "te":
+            chosen_tts = self.sarvam_tts
+        elif self._user_language == "hi":
+            chosen_tts = self.elevenlabs_tts
         else:
             chosen_tts = self.eleven_tts
 
