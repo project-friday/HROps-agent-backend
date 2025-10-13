@@ -61,6 +61,11 @@ class PowercutAgent(Agent):
         self.azure_tts = azure.TTS(
             voice="te-IN-ShrutiNeural",
         )
+        self.gemini_tts = google.beta.GeminiTTS(
+            model="gemini-2.5-pro-preview-tts",
+            voice_name="Zephyr",
+            instructions="Speak in a ploite, professional and clear manner always be to the point, take natural pauses and try to use simple words in telugu",
+        )
         creds_path = Path("credentials.json")
         with creds_path.open("r", encoding="utf-8") as f:
             google_creds = json.load(f)
@@ -71,6 +76,9 @@ class PowercutAgent(Agent):
         self.sarvam_tts = sarvam.TTS(
             target_language_code="te-IN",
             speaker="manisha",
+            pace=0.9,
+            enable_preprocessing=True,
+            pitch=0.1,
         )
         super().__init__(
             instructions=self.prompt,
@@ -133,6 +141,16 @@ class PowercutAgent(Agent):
             send_sms,
             create_ticket,
         }
+
+    def _log_to_file(self, label: str, text: str):
+        """Write user and LLM messages to logs/powercut_agent.log"""
+        try:
+            log_path = Path("logs/powercut_agent.log")
+            log_path.parent.mkdir(exist_ok=True)
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write(f"\n--- {label} ---\n{text.strip()}\n")
+        except Exception as e:
+            print(f"⚠️ Failed to write to log file: {e}")
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -236,6 +254,7 @@ class PowercutAgent(Agent):
         # Capture final response
         self.last_llm_response = "".join(buffer).strip()
         print("✅ Full LLM response captured:", self.last_llm_response)
+        self._log_to_file("LLM_OUTPUT", self.last_llm_response)
 
         # Execute queued tools + send results
         for action_name, tool_function, tool_args in pending_tools:
@@ -352,6 +371,7 @@ class PowercutAgent(Agent):
                                 ],
                                 recognition_usage=event.recognition_usage,
                             )
+                        self._log_to_file("USER_INPUT", processed_text)
 
                     yield event
             finally:
