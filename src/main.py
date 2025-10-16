@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession, room_io
 from livekit.plugins import noise_cancellation
+from livekit import agents
 
 from src.agents.powercut import PowercutAgent
 from src.agents.router import RouterAgent
@@ -67,4 +68,16 @@ if __name__ == "__main__":
     os.environ["TENANT_CLI_OVERRIDE"] = tenant
     os.environ["FLOW_CLI_OVERRIDE"] = flow
     print(f"Tenant={tenant}, Flow={flow}")
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    # Read telephony mode from .env (true/false)
+    is_telephony = os.getenv("LIVEKIT_TELEPHONY_MODE", "false").lower() == "true"
+    if is_telephony and tenant == "powercut":
+        # Telephony mode → fixed agent name for SIP dispatch
+        agents.cli.run_app(
+            agents.WorkerOptions(
+                entrypoint_fnc=entrypoint,
+                agent_name="powercut-telephony-agent"
+            )
+        )
+    else:
+        # Default (normal) mode
+        cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
