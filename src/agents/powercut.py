@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, AsyncIterable, Dict
 
 from dotenv import load_dotenv
-from livekit import rtc, api
-from livekit.agents import llm, stt, tokenize, tts, utils, get_job_context
+from livekit import api, rtc
+from livekit.agents import get_job_context, llm, stt, tokenize, tts, utils
 from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import azure, elevenlabs, google, openai, sarvam, silero, soniox
 
 from src.config.loader import get_cfg, render
+
 
 # --- Hangup helper (LiveKit Telephony) ---
 async def hangup_call():
@@ -25,9 +26,8 @@ async def hangup_call():
     ctx = get_job_context()
     if ctx is None:
         return  # not running in job context
-    await ctx.api.room.delete_room(
-        api.DeleteRoomRequest(room=ctx.room.name)
-    )
+    await ctx.api.room.delete_room(api.DeleteRoomRequest(room=ctx.room.name))
+
 
 # ---- Import powercut tools ----
 from src.tools.powercut_agent import (
@@ -434,9 +434,6 @@ class PowercutAgent(Agent):
     async def on_enter(self):
         cfg = get_cfg()
         await self.session.say(cfg["greeting"])
-        await self.session.generate_reply(
-            "Hello, Telangana Electricity Control Room, how can I help you today?"
-        )
 
     async def transfer_call(self):
         await self.session.generate_reply(
@@ -447,8 +444,8 @@ class PowercutAgent(Agent):
             await job_ctx.api.sip.transfer_sip_participant(
                 api.TransferSIPParticipantRequest(
                     room_name=job_ctx.room.name,
-                    participant_identity="+911234567890", # 🔁 replace with actual human number later
-                    transfer_to="tel:+911234567890"
+                    participant_identity="+911234567890",  # 🔁 replace with actual human number later
+                    transfer_to="tel:+911234567890",
                 )
             )
         except Exception as e:

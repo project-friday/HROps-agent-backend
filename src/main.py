@@ -3,10 +3,10 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+from livekit import agents
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession, room_io
 from livekit.plugins import noise_cancellation
-from livekit import agents
 
 from src.agents.powercut import PowercutAgent
 from src.agents.router import RouterAgent
@@ -72,11 +72,9 @@ if __name__ == "__main__":
     is_telephony = os.getenv("LIVEKIT_TELEPHONY_MODE", "false").lower() == "true"
     if is_telephony and tenant == "powercut":
         # Telephony mode → fixed agent name for SIP dispatch
+        print("Starting in telephony mode for powercut agent")
         agents.cli.run_app(
-            agents.WorkerOptions(
-                entrypoint_fnc=entrypoint,
-                agent_name="powercut-telephony-agent"
-            )
+            agents.WorkerOptions(entrypoint_fnc=entrypoint, agent_name="powercut-agent")
         )
     else:
         # Default (normal) mode
