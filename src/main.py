@@ -81,12 +81,51 @@ async def create_hr_session(ctx: JobContext):
     )
 
 
+# --- Emaar (Dubai Mall) support session ---
+async def create_mallsupport_session(ctx: JobContext):
+    """Start a session for the Emaar Dubai Mall Support Agent."""
+    from src.agents.mallsupport import MallSupportAgent  # your custom agent
+    from src.config.loader import get_cfg
+
+    cfg = get_cfg()  # includes tenant config (no language section, has voices + llm)
+
+    llm_cfg = cfg["llm"]
+    tts_cfg = cfg["tts"]
+
+    # Load LLM + VAD
+    llm = openai.LLM(model=llm_cfg.get("model"), temperature=llm_cfg.get("temperature"))
+    vad = silero.VAD.load()
+
+    # For MallSupportAgent, you can dynamically switch voices (English/Arabic)
+    # based on detection or user input inside the agent
+    # We'll default to English voice at startup
+    english_voice = cfg["voices"]["english"]
+    tts = elevenlabs.TTS(voice_id=english_voice, model=tts_cfg.get("model"))
+
+    await ctx.connect()
+    session = AgentSession(
+        llm=llm,
+        vad=vad,
+        tts=tts,
+    )
+
+    await session.start(
+        agent=MallSupportAgent(cfg, ctx.room),
+        room=ctx.room,
+        room_input_options=room_io.RoomInputOptions(
+            noise_cancellation=noise_cancellation.BVC()
+        ),
+    )
+
+
 # --- Main entrypoint ---
 async def entrypoint(ctx: JobContext):
     tenant_env = os.getenv("TENANT_CLI_OVERRIDE", "walmart")
 
     if tenant_env == "translator":
         await create_translator_session(ctx)
+    elif tenant_env == "emaar":
+        await create_mallsupport_session(ctx)
     else:
         await create_hr_session(ctx)
 

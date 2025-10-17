@@ -50,43 +50,56 @@ def get_cfg() -> dict:
     tenant_cfg = tenants[tenant]
     flow_cfg = tenant_cfg.get("flows", {}).get(flow, {})
 
-    # --- Merge tenant-level and flow-level ---
+    # --- Merge tenant + flow config ---
     cfg = {**tenant_cfg, **flow_cfg}
     cfg["tenant"] = tenant
     cfg["flow"] = flow
 
-    # --- Merge enabled_agents safely ---
+    # --- Default enabled agents ---
     if "enabled_agents" not in cfg:
         if tenant == "translator":
             cfg["enabled_agents"] = ["Translator"]
         else:
             cfg["enabled_agents"] = ["Applications", "Onboarding", "Assessment"]
 
-    # --- Tenant-level LLM config ---
+    # --- LLM config ---
     cfg["llm"] = tenant_cfg.get("llm", {"model": "gpt-4.1", "temperature": 0.1})
 
-    # --- Language-level STT/TTS config ---
-    language_cfg = tenant_cfg.get("language", {}).get(lang, {})
-    cfg["stt"] = language_cfg.get(
-        "stt", {"provider": "deepgram", "language_code": "en-US", "endpointing_ms": 200}
-    )
-    cfg["tts"] = language_cfg.get(
-        "tts", {"provider": "elevenlabs", "model": "eleven_turbo_v2_5"}
-    )
+    # --- Language/STT/TTS handling ---
+    if "language" in tenant_cfg:
+        # Tenants like HSBC/Walmart
+        language_cfg = tenant_cfg["language"].get(lang, {})
+        cfg["stt"] = language_cfg.get(
+            "stt",
+            {"provider": "deepgram", "language_code": "en-US", "endpointing_ms": 200},
+        )
+        cfg["tts"] = language_cfg.get(
+            "tts", {"provider": "elevenlabs", "model": "eleven_turbo_v2_5"}
+        )
+        cfg["voice_id"] = language_cfg.get("accent", {}).get(accent)
 
-    # --- Voice ID based on language+accent ---
-    cfg["voice_id"] = language_cfg.get("accent", {}).get(accent)
-    if not cfg["voice_id"]:
+    else:
+        # Tenants like Emaar (no language section, uses voices directly)
+        cfg["stt"] = tenant_cfg.get(
+            "stt",
+            {"provider": "deepgram", "language_code": "en-US", "endpointing_ms": 200},
+        )
+        cfg["tts"] = tenant_cfg.get(
+            "tts", {"provider": "elevenlabs", "model": "eleven_turbo_v2_5"}
+        )
+        cfg["voices"] = tenant_cfg.get("voices", {})
+        # Default voice_id: use English
+        cfg["voice_id"] = cfg["voices"].get("english")
+
+    if not cfg.get("voice_id"):
         print(
-            f"Warning: No voice ID found for language '{lang}' and accent '{accent}' "
-            f"in tenant '{tenant}'."
+            f"⚠️ Warning: No voice ID found for tenant '{tenant}' (lang={lang}, accent={accent})"
         )
 
     cfg["language"] = lang
     cfg["accent"] = accent
 
-    print(f"Using STT config:", cfg)
-
+    print(f"[Config Loaded] Tenant={tenant}, Flow={flow}, LLM={cfg['llm']['model']}")
     _CFG = cfg
     return _CFG
 

@@ -58,5 +58,25 @@ tenants:
         target_voice: "tomkxGQGz4b1kE0EM722"
         placeholder: "Spanish"
         language_code: es 
-        english_voice: "xctasy8XvGp2cVO9HL9k"           # for Deepgram/ElevenLabs
+        english_voice: "xctasy8XvGp2cVO9HL9k"   
+  emaar:
+    company_name: "Emaar (Dubai Mall)"
+    greeting: "Hello, this is Eve from Dubai Mall Customer Support. How may I assist you today?"
+    llm:
+      model: "gpt-4.1"
+      temperature: 0.1
+    flows:
+      default:
+        enabled_agents: ["CustomerSupport"]
+    stt:
+      provider: "deepgram"
+      language_code: "en-US"
+      endpointing_ms: 200
+    tts:
+      provider: "elevenlabs"
+      model: "eleven_turbo_v2_5"
+    voices:
+      english: "xctasy8XvGp2cVO9HL9k"
+      arabic: "SAFQ2n7Y1rFJ7LZg2b9R"
+        # for Deepgram/ElevenLabs
 
