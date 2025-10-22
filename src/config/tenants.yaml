@@ -70,13 +70,13 @@ tenants:
         enabled_agents: ["CustomerSupport"]
     stt:
       provider: "deepgram"
-      language_code: "en-US"
+      language_code: "multi"
       endpointing_ms: 200
     tts:
       provider: "elevenlabs"
       model: "eleven_turbo_v2_5"
     voices:
-      english: "xctasy8XvGp2cVO9HL9k"
-      arabic: "SAFQ2n7Y1rFJ7LZg2b9R"
+      english: "Z3R5wn05IrDiVCyEkUrK"
+      arabic: "4wf10lgibMnboGJGCLrP"
         # for Deepgram/ElevenLabs
 

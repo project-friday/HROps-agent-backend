@@ -8,16 +8,17 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
 
 from livekit import rtc
-from livekit.agents import llm, stt, utils, tts, tokenize
-from livekit.agents.voice import Agent, ModelSettings
+from livekit.agents import llm, stt, tokenize, tts, utils
 from livekit.agents.stt import SpeechEventType
+from livekit.agents.voice import Agent, ModelSettings
 
 # Plugins
-from livekit.plugins import elevenlabs, openai, silero, soniox, azure
+from livekit.plugins import azure, elevenlabs, openai, silero, soniox
+
+from src.config.loader import get_cfg
 
 # ---- Import only the knowledge base tool ----
 from src.tools.mallsupport_tools import query_knowledge_base
-from src.config.loader import get_cfg
 
 logger = logging.getLogger("dubai-mall-support-agent")
 logger.setLevel(logging.INFO)
@@ -42,7 +43,11 @@ class MallSupportAgent(Agent):
     def __init__(self, cfg: dict, room: rtc.Room, chat_ctx=None) -> None:
         self.room = room
         self.cfg = get_cfg()
-        self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
+        arabic_voice = cfg["voices"]["arabic"]
+        self.arabic_tts = elevenlabs.TTS(
+            voice_id=arabic_voice, model=cfg["tts"].get("model")
+        )
+        # self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
         super().__init__(
             instructions=EVE_MALL_PROMPT,
             stt=soniox.STT(
@@ -55,11 +60,9 @@ class MallSupportAgent(Agent):
             #     voice_id="H8bdWZHK2OgZwTN7ponr",
             #     model="eleven_multilingual_v2",
             # ),
-            tts=self.azure_tts_en,
             tools=[query_knowledge_base],
             chat_ctx=chat_ctx,
         )
-
 
         self.actions = {
             "Query Knowledge Base": query_knowledge_base,
@@ -233,18 +236,22 @@ class MallSupportAgent(Agent):
         model_settings: ModelSettings,
     ) -> AsyncGenerator[rtc.AudioFrame, None]:
         """
-        Dynamically choose Azure TTS voice based on detected STT language.
-        Arabic -> FatimaNeural
-        English -> JennyNeural
+        Dynamically choose  TTS voice based on detected STT language.
+
         """
         # 👂 Detect the last user language (default English)
         lang = getattr(self, "_user_language", "en")
-        if lang.startswith("ar"):
-            chosen_tts = azure.TTS(voice="ar-AE-FatimaNeural")
+        if not lang.startswith("en"):
+            print("🗣️ Using Arabic TTS voice")
+            chosen_tts = self.arabic_tts
         else:
-            chosen_tts = self.azure_tts_en
+            activity = self._get_activity_or_raise()
+            assert (
+                activity.tts is not None
+            ), "tts_node called but no TTS node is available"
 
-        # Handle non-streaming engines (mirror Powercut)
+            chosen_tts = activity.tts
+
         wrapped_tts = chosen_tts
         if not chosen_tts.capabilities.streaming:
             wrapped_tts = tts.StreamAdapter(
@@ -268,7 +275,6 @@ class MallSupportAgent(Agent):
                     yield ev.frame
             finally:
                 await asyncio.wait([forward_task])
-
 
     async def on_enter(self):
         cfg = get_cfg()
