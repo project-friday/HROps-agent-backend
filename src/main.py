@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession, room_io
-from livekit.plugins import elevenlabs, noise_cancellation, openai, silero
+from livekit.plugins import elevenlabs, noise_cancellation, openai, silero, soniox, azure
 
 from src.agents.router import RouterAgent
 from src.agents.translator import TranslatorAgent
