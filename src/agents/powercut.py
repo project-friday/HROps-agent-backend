@@ -4,18 +4,36 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncGenerator, AsyncIterable, Dict
+from typing import Any, AsyncGenerator, AsyncIterable, Dict, Optional
 
 from dotenv import load_dotenv
 from livekit import api, rtc
-from livekit.agents import get_job_context, llm, stt, tokenize, tts, utils
+from livekit.agents import (
+    JobContext,
+    RunContext,
+    function_tool,
+    get_job_context,
+    llm,
+    stt,
+    tokenize,
+    tts,
+    utils,
+)
 from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import azure, elevenlabs, google, openai, sarvam, silero, soniox
 
 from src.config.loader import get_cfg, render
+from src.models.data import UserData
+
+load_dotenv()
+
+
+RunContext_T = RunContext[UserData]
 
 
 # --- Hangup helper (LiveKit Telephony) ---
@@ -435,18 +453,118 @@ class PowercutAgent(Agent):
         cfg = get_cfg()
         await self.session.say(cfg["greeting"])
 
-    async def transfer_call(self):
+    @function_tool(
+        description="Transfer the current SIP call to a human agent via phone number."
+    )
+    async def transfer_call(self, context: RunContext_T):
+        """Transfers the active SIP participant to a specified phone number."""
+
         await self.session.generate_reply(
-            "Please hold, I’m connecting you to a human agent."
+            user_input="Please hold while I connect you to a human agent."
         )
-        job_ctx = get_job_context()
+
         try:
-            await job_ctx.api.sip.transfer_sip_participant(
-                api.TransferSIPParticipantRequest(
-                    room_name=job_ctx.room.name,
-                    participant_identity="+911234567890",  # 🔁 replace with actual human number later
-                    transfer_to="tel:+911234567890",
-                )
+            # Get LiveKit credentials
+            livekit_url = os.getenv("LIVEKIT_URL")
+            api_key = os.getenv("LIVEKIT_API_KEY")
+            api_secret = os.getenv("LIVEKIT_API_SECRET")
+
+            # Use the verified number - ensure proper E.164 format
+            transfer_number = "tel:+917994820760"
+
+            # Initialize LiveKit API
+            livekit_api = api.LiveKitAPI(
+                url=livekit_url,
+                api_key=api_key,
+                api_secret=api_secret,
             )
+
+            room = context.userdata.ctx.room
+
+            # ✅ FIXED: Use remote_participants instead of participants
+            logger.info("=== Room Participants Debug ===")
+            for participant in room.remote_participants.values():
+                participant_info = {
+                    "identity": participant.identity,
+                    "sid": participant.sid,
+                    "kind": getattr(participant, "kind", "N/A"),
+                    "type": type(participant).__name__,
+                    "is_local": participant.is_local,
+                }
+                logger.info(f"Participant: {participant_info}")
+
+            # Find SIP participant
+            sip_participant = None
+            for participant in room.remote_participants.values():
+                identity = participant.identity
+                if identity.startswith(("sip_", "+", "tel:")):
+                    sip_participant = participant
+                    logger.info(f"🎯 Found SIP participant: {identity}")
+                    break
+
+            if not sip_participant:
+                logger.error("❌ No SIP participant found")
+                await self.session.generate_reply(
+                    user_input="I'm sorry, I couldn't find a suitable connection to transfer your call."
+                )
+                await livekit_api.aclose()
+                return
+
+            # ✅ CORRECT: Create TransferSIPParticipantRequest with proper structure
+            transfer_req = api.TransferSIPParticipantRequest(
+                room_name=room.name,
+                participant_identity=sip_participant.identity,
+                transfer_to=transfer_number,
+                play_dialtone=True,
+                # Optional: Add headers if needed by Twilio
+                headers={
+                    "User-Agent": "LiveKit-Agent",
+                    # "X-Twilio-Caller-ID": "+917994820760"  # If Twilio needs specific headers
+                },
+                # Optional: Set ringing timeout (default is usually fine)
+                # ringing_timeout=duration_pb2.Duration(seconds=30)
+            )
+
+            logger.info(
+                f"🔄 Transferring {sip_participant.identity} to {transfer_number}"
+            )
+
+            # Execute the transfer
+            await livekit_api.sip.transfer_sip_participant(transfer_req)
+            logger.info("✅ Call transfer initiated successfully")
+
+            # Close API connection properly
+            await livekit_api.aclose()
+
         except Exception as e:
-            print(f"⚠️ Call transfer failed: {e}")
+            logger.error(f"❌ Call transfer failed: {e}")
+
+            # More specific error handling based on SIP status codes
+            error_msg = str(e)
+
+            if "403" in error_msg and "Caller ID verification rejected" in error_msg:
+                # This is a Twilio-specific restriction
+                logger.error(
+                    "🔒 Twilio Caller ID verification failed - number may need additional verification"
+                )
+                await self.session.generate_reply(
+                    user_input="I'm unable to transfer due to security restrictions. Please contact our support team directly at +917994820760."
+                )
+
+            elif "408" in error_msg or "timeout" in error_msg.lower():
+                # Timeout error
+                await self.session.generate_reply(
+                    user_input="The transfer timed out. The line may be busy. Let me help you with your issue directly."
+                )
+
+            elif "403" in error_msg:
+                # General forbidden error
+                await self.session.generate_reply(
+                    user_input="I don't have permission to transfer calls at the moment. Please stay on the line for assistance."
+                )
+
+            else:
+                # Generic error
+                await self.session.generate_reply(
+                    user_input="I encountered a technical issue transferring your call. Let me continue helping you with your power outage issue."
+                )
