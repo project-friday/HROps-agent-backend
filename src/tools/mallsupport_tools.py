@@ -2,6 +2,7 @@ import json
 import os
 import random
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -114,3 +115,17 @@ async def query_knowledge_base(question: str, top_k: int = 4) -> dict:
     )
 
     return {"answer": stitched, "snippets": snippets}
+
+
+@function_tool(description="Create ticket for any issue reported by customer.")
+async def create_ticket(phone_number: int, issue_description: str) -> dict:
+    ticket_id = time.strftime("ticket_%Y-%m-%d_%H-%M-%S")
+    ticket = {
+        "ticket_id": ticket_id,
+        "phone": phone_number,
+        "issue_description": issue_description,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "status": "Emergency" if "EMERGENCY" in issue_description.upper() else "Open",
+    }
+
+    return ticket

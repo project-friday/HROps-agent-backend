@@ -18,7 +18,7 @@ from livekit.plugins import azure, elevenlabs, openai, silero, soniox
 from src.config.loader import get_cfg
 
 # ---- Import only the knowledge base tool ----
-from src.tools.mallsupport_tools import query_knowledge_base
+from src.tools.mallsupport_tools import create_ticket, query_knowledge_base
 
 logger = logging.getLogger("dubai-mall-support-agent")
 logger.setLevel(logging.INFO)
@@ -54,31 +54,32 @@ class MallSupportAgent(Agent):
                 params=soniox.STTOptions(language_hints=["en", "ar"]),
                 vad=silero.VAD.load(min_speech_duration=0.1),
             ),
-            llm=openai.LLM(model="gpt-4o-mini", temperature=0.2),
-            vad=silero.VAD.load(min_speech_duration=0.1),
             # tts=elevenlabs.TTS(
             #     voice_id="H8bdWZHK2OgZwTN7ponr",
             #     model="eleven_multilingual_v2",
             # ),
-            tools=[query_knowledge_base],
+            tools=[query_knowledge_base, create_ticket],
             chat_ctx=chat_ctx,
         )
 
         self.actions = {
             "Query Knowledge Base": query_knowledge_base,
+            "Creating ticket": create_ticket,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
         # Optional: keys to filter from tool results before sending
         self.tool_result_filters = {
             query_knowledge_base: ["internal_id", "metadata"],
+            create_ticket: ["ticket_id"],
         }
 
         self.tool_cards = {
             query_knowledge_base: "knowledge_base_result",
+            create_ticket: "ticket_creation_result",
         }
 
-        self.visible_tools = {query_knowledge_base}
+        self.visible_tools = {create_ticket}
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
