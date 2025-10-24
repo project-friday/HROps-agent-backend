@@ -12,6 +12,7 @@ from src.agents.powercut import PowercutAgent
 from src.agents.router import RouterAgent
 from src.agents.translator import TranslatorAgent
 from src.helpers.arg_parser import parse_cli_args
+from src.models.data import UserData
 
 # Load .env from repo root
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,6 +46,8 @@ async def entrypoint(ctx: JobContext):
         )
     elif tenant == "powercut":
         print("Starting in powercut mode")
+        user_data = UserData(ctx=ctx)
+        session.userdata = user_data
         await session.start(
             agent=PowercutAgent(room=ctx.room),
             room_input_options=room_io.RoomInputOptions(
