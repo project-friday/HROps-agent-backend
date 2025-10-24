@@ -71,12 +71,12 @@ tenants:
     stt:
       provider: "deepgram"
       language_code: "multi"
-      endpointing_ms: 200
+      endpointing_ms: 50
     tts:
       provider: "elevenlabs"
       model: "eleven_turbo_v2_5"
     voices:
-      english: "Z3R5wn05IrDiVCyEkUrK"
+      english: "H8bdWZHK2OgZwTN7ponr"
       arabic: "4wf10lgibMnboGJGCLrP"
         # for Deepgram/ElevenLabs
 
