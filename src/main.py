@@ -107,6 +107,13 @@ async def create_mallsupport_session(ctx: JobContext):
     # based on detection or user input inside the agent
     # We'll default to English voice at startup
     english_voice = cfg["voices"]["english"]
+    # voice_settings = elevenlabs.VoiceSettings(
+    #     stability=0.5,  # optional
+    #     similarity_boost=0.8,  # optional
+    #     # style=0.0,            # optional (neutral)
+    #     speed=0.92,
+    # )
+
     tts = elevenlabs.TTS(voice_id=english_voice, model=tts_cfg.get("model"))
 
     await ctx.connect()
