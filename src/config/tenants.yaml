@@ -61,7 +61,7 @@ tenants:
         english_voice: "xctasy8XvGp2cVO9HL9k"   
   emaar:
     company_name: "Emaar (Dubai Mall)"
-    greeting: "Hello, this is Eve from Dubai Mall Customer Support. How may I assist you today?"
+    greeting: "Hello, welcome to the Dubai Mall Customer Care, this is Sarah speaking. How may I help you today?"
     llm:
       model: "gpt-4.1"
       temperature: 0.1
