@@ -7,23 +7,17 @@
   "job_title": "AI Engineer",
   "status": "interview_scheduled",
   "resume_reviewed": "Not yet",
-  "updated_at": "2025-10-07T05:56+00:00",
+  "updated_at": "2025-30-07T05:56+00:00",
   "response_timeframe": "Immediate",
-  "description": "Interview scheduled for Oct 20, 2025 at 10:30 AM via Google Meet. Recruiter: Priya Sharma. Please keep your portfolio ready.",
+  "description": "Interview scheduled for Oct 30, 2025 at 10:30 AM via Google Meet. Recruiter: Priya Sharma. Please keep your portfolio ready.",
   "interview": {
     "status": "rescheduled",
-    "scheduled_at": "2025-10-20T16:15+05:30",
+    "scheduled_at": "2025-30-10T16:15+05:30",
     "timezone": "Asia/Kolkata",
     "mode": "video",
     "location_or_link": "https://meet.google.com/xyz-123",
     "interviewer": "Priya Sharma"
   },
   "reschedules": [
-    {
-      "old_time": "2025-10-10T11:00:00+05:30",
-      "new_time": "2025-10-20T11:00:00+05:30",
-      "changed_at": "2025-10-07T17:16:00+00:00",
-      "reason": "candidate_request"
-    }
   ]
 }
