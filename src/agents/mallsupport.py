@@ -16,6 +16,7 @@ from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import azure, elevenlabs, openai, silero, soniox
 
 from src.config.loader import get_cfg
+from src.tools.handover import handover_to_survey
 
 # ---- Import only the knowledge base tool ----
 from src.tools.mallsupport_tools import create_ticket, query_knowledge_base
@@ -43,9 +44,19 @@ class MallSupportAgent(Agent):
     def __init__(self, cfg: dict, room: rtc.Room, chat_ctx=None) -> None:
         self.room = room
         self.cfg = get_cfg()
-        arabic_voice = cfg["voices"]["arabic"]
+        tts_cfg = cfg.get("tts", {})
+        voices = tts_cfg.get("voices", {})
+
+        arabic_voice = voices.get("arabic") or self.cfg.get("voices", {}).get(
+            "arabic"
+        )  # fallback to tenant-level
+
+        if not arabic_voice:
+            raise RuntimeError("❌ No Arabic voice configured for MallSupportAgent")
+
         self.arabic_tts = elevenlabs.TTS(
-            voice_id=arabic_voice, model=cfg["tts"].get("model")
+            voice_id=arabic_voice,
+            model=tts_cfg.get("model", "eleven_turbo_v2_5"),
         )
         # self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
         super().__init__(
@@ -58,13 +69,14 @@ class MallSupportAgent(Agent):
             #     voice_id="H8bdWZHK2OgZwTN7ponr",
             #     model="eleven_multilingual_v2",
             # ),
-            tools=[query_knowledge_base, create_ticket],
+            tools=[query_knowledge_base, create_ticket, handover_to_survey],
             chat_ctx=chat_ctx,
         )
 
         self.actions = {
             "Query Knowledge Base": query_knowledge_base,
             "Creating ticket": create_ticket,
+            "Handover to Survey": handover_to_survey,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
@@ -77,6 +89,7 @@ class MallSupportAgent(Agent):
         self.tool_cards = {
             query_knowledge_base: "knowledge_base_result",
             create_ticket: "ticket_creation_result",
+            handover_to_survey: "survey_handover",
         }
 
         self.visible_tools = {create_ticket}
