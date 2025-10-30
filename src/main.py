@@ -88,34 +88,40 @@ async def create_hr_session(ctx: JobContext):
     )
 
 
-# --- Emaar (Dubai Mall) support session ---
 async def create_mallsupport_session(ctx: JobContext):
-    """Start a session for the Emaar Dubai Mall Support Agent."""
-    from src.agents.mallsupport import MallSupportAgent  # your custom agent
+    """Start a session for the Emaar Dubai Mall Support Agent (English voice only)."""
+    from src.agents.mallsupport import MallSupportAgent
     from src.config.loader import get_cfg
 
-    cfg = get_cfg()  # includes tenant config (no language section, has voices + llm)
+    # --- Load tenant + agent config ---
+    cfg = get_cfg()
+    agent_cfg = cfg["agents"]["MallSupportAgent"]
 
-    llm_cfg = cfg["llm"]
-    tts_cfg = cfg["tts"]
+    # --- LLM setup ---
+    llm_cfg = agent_cfg["llm"]
+    llm = openai.LLM(
+        model=llm_cfg.get("model"),
+        temperature=llm_cfg.get("temperature"),
+    )
 
-    # Load LLM + VAD
-    llm = openai.LLM(model=llm_cfg.get("model"), temperature=llm_cfg.get("temperature"))
+    # --- Voice Activity Detection (VAD) ---
     vad = silero.VAD.load()
 
-    # For MallSupportAgent, you can dynamically switch voices (English/Arabic)
-    # based on detection or user input inside the agent
-    # We'll default to English voice at startup
-    english_voice = cfg["voices"]["english"]
-    # voice_settings = elevenlabs.VoiceSettings(
-    #     stability=0.5,  # optional
-    #     similarity_boost=0.8,  # optional
-    #     # style=0.0,            # optional (neutral)
-    #     speed=0.92,
-    # )
+    # --- TTS setup (English only) ---
+    tts_cfg = agent_cfg["tts"]
+    english_voice = tts_cfg.get("voices", {}).get("english") or cfg.get(
+        "voices", {}
+    ).get("english")
 
-    tts = elevenlabs.TTS(voice_id=english_voice, model=tts_cfg.get("model"))
+    if not english_voice:
+        raise RuntimeError("❌ No English voice configured for MallSupportAgent")
 
+    tts = elevenlabs.TTS(
+        voice_id=english_voice,
+        model=tts_cfg.get("model", "eleven_turbo_v2_5"),
+    )
+
+    # --- Connect + start session ---
     await ctx.connect()
     session = AgentSession(
         llm=llm,
@@ -124,7 +130,7 @@ async def create_mallsupport_session(ctx: JobContext):
     )
 
     await session.start(
-        agent=MallSupportAgent(cfg, ctx.room),
+        agent=MallSupportAgent(agent_cfg, ctx.room),
         room=ctx.room,
         room_input_options=room_io.RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC()

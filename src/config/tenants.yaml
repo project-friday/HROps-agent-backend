@@ -62,21 +62,41 @@ tenants:
   emaar:
     company_name: "Emaar (Dubai Mall)"
     greeting: "Hello, welcome to the Dubai Mall Customer Care, this is Sarah speaking. How may I help you today?"
+
     llm:
       model: "gpt-4.1"
       temperature: 0.1
+
     flows:
       default:
-        enabled_agents: ["CustomerSupport"]
-    stt:
-      provider: "deepgram"
-      language_code: "multi"
-      endpointing_ms: 50
-    tts:
-      provider: "elevenlabs"
-      model: "eleven_turbo_v2_5"
-    voices:
-      english: "H8bdWZHK2OgZwTN7ponr"
-      arabic: "4wf10lgibMnboGJGCLrP"
-        # for Deepgram/ElevenLabs
+        enabled_agents: ["MallSupportAgent", "SurveyAgent"]
+
+    agents:
+      MallSupportAgent:
+        stt:
+          provider: "deepgram"
+          language_code: "en"
+          endpointing_ms: 100
+        tts:
+          provider: "elevenlabs"
+          model: "eleven_turbo_v2_5"
+          voices:
+            english: "H8bdWZHK2OgZwTN7ponr"   # English - Indian accent
+            arabic: "4wf10lgibMnboGJGCLrP"    # Arabic voice
+        greeting: "Hello, this is Sarah from Dubai Mall Customer Support. How can I assist you today?"
+
+      SurveyAgent:
+        stt:
+          provider: "deepgram"
+          language_code: "ar"
+          endpointing_ms: 150
+        tts:
+          provider: "elevenlabs"
+          model: "eleven_turbo_v2_5"
+          voices:
+            english: "MClEFoImJXBTgLwdLI5n"   # English - Indian accent
+            arabic: "aCChyB4P5WEomwRsOKRh"    # Arabic voice
+        greeting: "Marhaba! This is the Dubai Mall feedback survey. Would you like to answer a few quick questions?"
+
+          # for Deepgram/ElevenLabs
 
