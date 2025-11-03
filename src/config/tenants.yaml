@@ -83,12 +83,13 @@ tenants:
           voices:
             english: "H8bdWZHK2OgZwTN7ponr"   # English - Indian accent
             arabic: "4wf10lgibMnboGJGCLrP"    # Arabic voice
+            mandarin: "hkfHEbBvdQFNX4uWHqRF"  # Mandarin voice
         greeting: "Hello, this is Sarah from Dubai Mall Customer Support. How can I assist you today?"
 
       SurveyAgent:
         stt:
           provider: "deepgram"
-          language_code: "ar"
+          language_code: "en"
           endpointing_ms: 150
         tts:
           provider: "elevenlabs"
@@ -96,7 +97,8 @@ tenants:
           voices:
             english: "MClEFoImJXBTgLwdLI5n"   # English - Indian accent
             arabic: "aCChyB4P5WEomwRsOKRh"    # Arabic voice
-        greeting: "Marhaba! This is the Dubai Mall feedback survey. Would you like to answer a few quick questions?"
+            mandarin: "hkfHEbBvdQFNX4uWHqRF"  # Mandarin voice
+        greeting:   "Hello there! Hope Sarah helped you well! Could you please rate your experience of having conversation with her from one to five, where one is the lowest and five is the best?"
 
           # for Deepgram/ElevenLabs
 
