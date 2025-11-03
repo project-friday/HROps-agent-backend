@@ -16,7 +16,7 @@ from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import elevenlabs, silero, soniox
 
 from src.config.loader import get_cfg
-from src.tools.survey_tools import record_feedback
+from src.tools.survey_tools import feedback_call_tool, feedback_sms_tool
 
 logger = logging.getLogger("dubai-mall-survey-agent")
 logger.setLevel(logging.INFO)
@@ -61,29 +61,56 @@ class SurveyAgent(Agent):
             voice_id=english_voice,
             model=tts_cfg.get("model", "eleven_turbo_v2_5"),
         )
+        mandarin_voice = voices.get("mandarin") or self.cfg.get("voices", {}).get("mandarin")
+        self.mandarin_tts = None
+        if mandarin_voice:
+            self.mandarin_tts = elevenlabs.TTS(
+                voice_id=mandarin_voice,
+                model=tts_cfg.get("model", "eleven_turbo_v2_5"),
+            )
 
         super().__init__(
             instructions=EVE_SURVEY_PROMPT,
             stt=soniox.STT(
-                params=soniox.STTOptions(language_hints=["en", "ar"]),
+                params=soniox.STTOptions(language_hints=["en", "ar", "zh"]),
                 vad=silero.VAD.load(min_speech_duration=0.1),
             ),
-            tools=[record_feedback],
+            tools=[feedback_call_tool, feedback_sms_tool],
             chat_ctx=chat_ctx,
         )
 
         # --- Tool actions ---
         self.actions = {
-            "Record Feedback": record_feedback,
+            "Feedback Rating": feedback_call_tool,
+            "Feedback SMS": feedback_sms_tool,
             # "Submit Survey Response": submit_survey_response,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
-        self.visible_tools = {record_feedback}
+        self.visible_tools = {feedback_call_tool, feedback_sms_tool}
 
-    async def _send_websocket_message(self, action: str, result: Dict[str, Any] = None):
-        """Send WebSocket update when tool actions are triggered."""
-        message = {"action": action, "result": result or {}}
+        self.tool_result_filters = {
+            feedback_call_tool: [],
+            feedback_sms_tool: [],
+        }
+
+        self.tool_cards = {
+            feedback_call_tool: "feedback_call_result",
+            feedback_sms_tool: "feedback_sms_result",
+        }
+
+    async def _send_websocket_message(
+        self, action: str, result: Dict[str, Any] = None, tool_func=None
+    ):
+        message = {"action": action}
+
+        if result is not None:
+            if tool_func in self.tool_result_filters:
+                for key in self.tool_result_filters[tool_func]:
+                    result.pop(key, None)
+            message["result"] = result
+            message["card_name"] = self.tool_cards.get(tool_func, "generic")
+
         try:
             await self.room.local_participant.send_text(
                 json.dumps(message), topic="lk.transcription"
@@ -98,21 +125,79 @@ class SurveyAgent(Agent):
         tools: list[llm.FunctionTool | llm.RawFunctionTool],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[llm.ChatChunk | str, None]:
-        """Capture LLM outputs and trigger tool calls."""
+        """Capture LLM outputs and execute tools with arguments."""
         activity = self._get_activity_or_raise()
         assert activity.llm is not None, "llm_node called but no LLM node available"
+        assert isinstance(activity.llm, llm.LLM)
 
-        buffer = []
-        async with activity.llm.chat(chat_ctx=chat_ctx, tools=tools) as stream:
+        tool_choice = model_settings.tool_choice if model_settings else llm.NOT_GIVEN
+        activity_llm = activity.llm
+        conn_options = activity.session.conn_options.llm_conn_options
+
+        buffer: list[str] = []
+        pending_tools: list[tuple[str, callable, dict]] = []
+
+        async with activity_llm.chat(
+            chat_ctx=chat_ctx,
+            tools=tools,
+            tool_choice=tool_choice,
+            conn_options=conn_options,
+        ) as stream:
             async for chunk in stream:
                 if isinstance(chunk, str):
                     buffer.append(chunk)
-                elif isinstance(chunk, llm.ChatChunk) and chunk.delta:
-                    if chunk.delta.content:
+                elif isinstance(chunk, llm.ChatChunk):
+                    if chunk.delta and chunk.delta.content:
                         buffer.append(chunk.delta.content)
+
+                    # 🟢 Detect when the LLM triggers a tool call
+                    if chunk.delta and chunk.delta.tool_calls:
+                        for tool_call in chunk.delta.tool_calls:
+                            tool_name = tool_call.name
+                            tool_args = tool_call.arguments or "{}"
+
+                            if isinstance(tool_args, str):
+                                try:
+                                    tool_args = json.loads(tool_args)
+                                except json.JSONDecodeError:
+                                    tool_args = {}
+
+                            # Match the function by name
+                            tool_function = None
+                            action_name = None
+                            for name, func in self.actions.items():
+                                if func.__name__ == tool_name:
+                                    tool_function = func
+                                    action_name = name
+                                    break
+
+                            if tool_function and action_name:
+                                await self._send_websocket_message(action_name)
+                                pending_tools.append(
+                                    (action_name, tool_function, tool_args)
+                                )
+
                 yield chunk
 
         self.last_llm_response = "".join(buffer).strip()
+
+        for action_name, tool_function, tool_args in pending_tools:
+            if tool_function not in self.visible_tools:
+                continue
+            try:
+                if asyncio.iscoroutinefunction(tool_function):
+                    result = await tool_function(**tool_args)
+                else:
+                    result = tool_function(**tool_args)
+
+                await self._send_websocket_message(
+                    action_name, result, tool_func=tool_function
+                )
+            except Exception as e:
+                await self._send_websocket_message(
+                    action_name, {"error": str(e)}, tool_func=tool_function
+                )
+
 
     async def stt_node(
         self,
@@ -158,9 +243,12 @@ class SurveyAgent(Agent):
         """Switch TTS voice dynamically based on detected language."""
         lang = getattr(self, "_user_language", "en")
 
-        if not lang.startswith("en"):
+        if lang.startswith("ar"):
             print("🗣️ Using Arabic survey TTS")
             chosen_tts = self.arabic_tts
+        elif lang.startswith("zh"):
+            print("🗣️ Using Mandarin survey TTS")
+            chosen_tts = self.mandarin_tts
         else:
             print("🗣️ Using English survey TTS")
             chosen_tts = self.english_tts
