@@ -19,7 +19,7 @@ from src.config.loader import get_cfg
 from src.tools.handover import handover_to_survey
 
 # ---- Import only the knowledge base tool ----
-from src.tools.mallsupport_tools import create_ticket, query_knowledge_base
+from src.tools.mallsupport_tools import create_ticket, query_knowledge_base, feedback_sms_tool
 
 logger = logging.getLogger("dubai-mall-support-agent")
 logger.setLevel(logging.INFO)
@@ -58,18 +58,26 @@ class MallSupportAgent(Agent):
             voice_id=arabic_voice,
             model=tts_cfg.get("model", "eleven_turbo_v2_5"),
         )
+
+        mandarin_voice = voices.get("mandarin") or self.cfg.get("voices", {}).get("mandarin")
+        self.mandarin_tts = None
+        if mandarin_voice:
+            self.mandarin_tts = elevenlabs.TTS(
+                voice_id=mandarin_voice,
+                model=tts_cfg.get("model", "eleven_turbo_v2_5"),
+            )
         # self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
         super().__init__(
             instructions=EVE_MALL_PROMPT,
             stt=soniox.STT(
-                params=soniox.STTOptions(language_hints=["en", "ar"]),
+                params=soniox.STTOptions(language_hints=["en", "ar", "zh"]),
                 vad=silero.VAD.load(min_speech_duration=0.1),
             ),
             # tts=elevenlabs.TTS(
             #     voice_id="H8bdWZHK2OgZwTN7ponr",
             #     model="eleven_multilingual_v2",
             # ),
-            tools=[query_knowledge_base, create_ticket, handover_to_survey],
+            tools=[query_knowledge_base, create_ticket, handover_to_survey, feedback_sms_tool],
             chat_ctx=chat_ctx,
         )
 
@@ -77,6 +85,7 @@ class MallSupportAgent(Agent):
             "Query Knowledge Base": query_knowledge_base,
             "Creating ticket": create_ticket,
             "Handover to Survey": handover_to_survey,
+            "Send Feedback SMS": feedback_sms_tool,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
@@ -84,15 +93,17 @@ class MallSupportAgent(Agent):
         self.tool_result_filters = {
             query_knowledge_base: ["internal_id", "metadata"],
             create_ticket: ["ticket_id"],
+            feedback_sms_tool: [],
         }
 
         self.tool_cards = {
             query_knowledge_base: "knowledge_base_result",
             create_ticket: "ticket_creation_result",
             handover_to_survey: "survey_handover",
+            feedback_sms_tool: "feedback_sms_sent",
         }
 
-        self.visible_tools = {create_ticket}
+        self.visible_tools = {create_ticket, feedback_sms_tool}
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -255,15 +266,15 @@ class MallSupportAgent(Agent):
         """
         # 👂 Detect the last user language (default English)
         lang = getattr(self, "_user_language", "en")
-        if not lang.startswith("en"):
+        if lang.startswith("ar"):
             print("🗣️ Using Arabic TTS voice")
             chosen_tts = self.arabic_tts
+        elif lang.startswith("zh"):
+            print("🗣️ Using Mandarin TTS voice")
+            chosen_tts = self.mandarin_tts
         else:
             activity = self._get_activity_or_raise()
-            assert (
-                activity.tts is not None
-            ), "tts_node called but no TTS node is available"
-
+            assert activity.tts is not None, "tts_node called but no TTS node is available"
             chosen_tts = activity.tts
 
         wrapped_tts = chosen_tts
