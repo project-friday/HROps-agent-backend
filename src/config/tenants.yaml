@@ -84,6 +84,16 @@ tenants:
             english: "H8bdWZHK2OgZwTN7ponr"   # English - Indian accent
             arabic: "4wf10lgibMnboGJGCLrP"    # Arabic voice
             mandarin: "hkfHEbBvdQFNX4uWHqRF"  # Mandarin voice
+        tts:
+          model: "sonic-3"
+          providers:
+            arabic: "cartesia"
+            english: "cartesia"
+            mandarin: "inworld"
+          voices:
+            arabic: "6304c635-6681-4f9e-85b6-a97f4d26461a"  # Amira
+            english: "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc" # Jacqueline
+            mandarin: "Jing"   # Jing 
         greeting: "Hello, this is Sarah from Dubai Mall Customer Support. How can I assist you today?"
 
       SurveyAgent:
@@ -92,12 +102,15 @@ tenants:
           language_code: "en"
           endpointing_ms: 150
         tts:
-          provider: "elevenlabs"
-          model: "eleven_turbo_v2_5"
+          model: "sonic-3"
+          providers:
+            arabic: "cartesia"
+            english: "inworld"
+            mandarin: "inworld"
           voices:
-            english: "MClEFoImJXBTgLwdLI5n"   # English - Indian accent
-            arabic: "aCChyB4P5WEomwRsOKRh"    # Arabic voice
-            mandarin: "hkfHEbBvdQFNX4uWHqRF"  # Mandarin voice
+            arabic: "6304c635-6681-4f9e-85b6-a97f4d26461a"  # Amira
+            english: "Sarah" # Sarah
+            mandarin: "Jing"   # Jing 
         greeting:   "Hello there! Hope Sarah helped you well! Could you please rate your experience of having conversation with her from one to five, where one is the lowest and five is the best?"
 
           # for Deepgram/ElevenLabs
