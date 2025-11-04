@@ -11,9 +11,9 @@
   },
   "offer": {
     "status": "sent",
-    "sent_date": "2025-10-17",
-    "acceptance_deadline": "2025-11-05",
-    "joining_date": "2025-11-17",
+    "sent_date": "2025-11-03",
+    "acceptance_deadline": "2025-11-10",
+    "joining_date": "2025-11-28",
     "probation": {
       "duration_months": 3,
       "notice_period_days": 30
@@ -41,7 +41,7 @@
     "manager_title": "Engineering Manager",
     "manager_email": "anita.sharma@company.com",
     "intro_call_scheduled": true,
-    "intro_call_date": "2025-11-18T11:15"
+    "intro_call_date": "2025-12-01T11:15"
   },
   "preboarding": {
     "tasks": [
