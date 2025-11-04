@@ -13,7 +13,7 @@ from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
 
 # Plugins
-from livekit.plugins import elevenlabs, silero, soniox
+from livekit.plugins import elevenlabs, silero, soniox, cartesia, inworld
 
 from src.config.loader import get_cfg
 from src.tools.survey_tools import feedback_call_tool, feedback_sms_tool
@@ -40,34 +40,38 @@ class SurveyAgent(Agent):
     def __init__(self, cfg: dict, room: rtc.Room, chat_ctx=None) -> None:
         self.room = room
         self.cfg = get_cfg()
-
-        # --- Voice Setup (Arabic & English) ---
+        # ---------- TTS setup (multi-language) ----------
         tts_cfg = cfg.get("tts", {})
         voices = tts_cfg.get("voices", {})
+        providers = tts_cfg.get("providers", {})
 
-        arabic_voice = voices.get("arabic") or self.cfg.get("voices", {}).get("arabic")
-        english_voice = voices.get("english") or self.cfg.get("voices", {}).get(
-            "english"
-        )
+        # ---- English (Inworld Sarah) ----
+        english_voice = voices.get("english")
+        self.english_tts = None
+        if english_voice and providers.get("english", "inworld") == "inworld":
+            self.english_tts = inworld.TTS(voice=english_voice)
+        else:
+            raise RuntimeError("❌ No English Inworld voice configured")
 
-        if not arabic_voice or not english_voice:
-            raise RuntimeError("❌ Missing one or both voices for SurveyAgent")
-
-        self.arabic_tts = elevenlabs.TTS(
-            voice_id=arabic_voice,
-            model=tts_cfg.get("model", "eleven_turbo_v2_5"),
-        )
-        self.english_tts = elevenlabs.TTS(
-            voice_id=english_voice,
-            model=tts_cfg.get("model", "eleven_turbo_v2_5"),
-        )
-        mandarin_voice = voices.get("mandarin") or self.cfg.get("voices", {}).get("mandarin")
-        self.mandarin_tts = None
-        if mandarin_voice:
-            self.mandarin_tts = elevenlabs.TTS(
-                voice_id=mandarin_voice,
-                model=tts_cfg.get("model", "eleven_turbo_v2_5"),
+        # ---- Arabic (Cartesia) ----
+        arabic_voice = voices.get("arabic")
+        self.arabic_tts = None
+        if arabic_voice and providers.get("arabic", "cartesia") == "cartesia":
+            self.arabic_tts = cartesia.TTS(
+                model=tts_cfg.get("model", "sonic-3"),
+                voice=arabic_voice,
+                language="ar",
             )
+        else:
+            raise RuntimeError("❌ No Arabic Cartesia voice configured")
+
+        # ---- Mandarin (Inworld) ----
+        mandarin_voice = voices.get("mandarin")
+        self.mandarin_tts = None
+        if mandarin_voice and providers.get("mandarin") == "inworld":
+            self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
+        else:
+            raise RuntimeError("❌ No Mandarin Inworld voice configured")
 
         super().__init__(
             instructions=EVE_SURVEY_PROMPT,
