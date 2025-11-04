@@ -13,7 +13,7 @@ from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
 
 # Plugins
-from livekit.plugins import azure, elevenlabs, openai, silero, soniox
+from livekit.plugins import azure, elevenlabs, openai, silero, soniox, cartesia
 
 from src.config.loader import get_cfg
 from src.tools.handover import handover_to_survey
@@ -44,28 +44,40 @@ class MallSupportAgent(Agent):
     def __init__(self, cfg: dict, room: rtc.Room, chat_ctx=None) -> None:
         self.room = room
         self.cfg = get_cfg()
+        # ---------- TTS setup (multi-language) ----------
         tts_cfg = cfg.get("tts", {})
         voices = tts_cfg.get("voices", {})
+        providers = tts_cfg.get("providers", {})
 
-        arabic_voice = voices.get("arabic") or self.cfg.get("voices", {}).get(
-            "arabic"
-        )  # fallback to tenant-level
+        # ---- English (Cartesia) ----
+        english_voice = voices.get("english")
+        self.english_tts = None
+        if english_voice and providers.get("english", "cartesia") == "cartesia":
+            self.english_tts = cartesia.TTS(
+                model=tts_cfg.get("model", "sonic-3"),
+                voice=english_voice,
+                language="en",
+            )
 
-        if not arabic_voice:
-            raise RuntimeError("❌ No Arabic voice configured for MallSupportAgent")
+        # ---- Arabic (Cartesia) ----
+        arabic_voice = voices.get("arabic")
+        if arabic_voice and providers.get("arabic", "cartesia") == "cartesia":
+            self.arabic_tts = cartesia.TTS(
+                model=tts_cfg.get("model", "sonic-3"),
+                voice=arabic_voice,
+                language="ar",
+            )
+        else:
+            raise RuntimeError("❌ No Arabic Cartesia voice configured")
 
-        self.arabic_tts = elevenlabs.TTS(
-            voice_id=arabic_voice,
-            model=tts_cfg.get("model", "eleven_turbo_v2_5"),
-        )
-
-        mandarin_voice = voices.get("mandarin") or self.cfg.get("voices", {}).get("mandarin")
+        # ---- Mandarin (Inworld) ----
+        mandarin_voice = voices.get("mandarin")
         self.mandarin_tts = None
         if mandarin_voice:
-            self.mandarin_tts = elevenlabs.TTS(
-                voice_id=mandarin_voice,
-                model=tts_cfg.get("model", "eleven_turbo_v2_5"),
-            )
+            if providers.get("mandarin") == "inworld":
+                from livekit.plugins import inworld
+                self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
+
         # self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
         super().__init__(
             instructions=EVE_MALL_PROMPT,
