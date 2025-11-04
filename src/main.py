@@ -12,6 +12,8 @@ from livekit.plugins import (
     openai,
     silero,
     soniox,
+    cartesia,
+    inworld,
 )
 
 from src.agents.router import RouterAgent
@@ -116,10 +118,17 @@ async def create_mallsupport_session(ctx: JobContext):
     if not english_voice:
         raise RuntimeError("❌ No English voice configured for MallSupportAgent")
 
-    tts = elevenlabs.TTS(
-        voice_id=english_voice,
-        model=tts_cfg.get("model", "eleven_turbo_v2_5"),
-    )
+    # tts = elevenlabs.TTS(
+    #     voice_id=english_voice,
+    #     model=tts_cfg.get("model", "eleven_turbo_v2_5"),
+    # )
+    provider = tts_cfg.get("providers", {}).get("english", "cartesia")
+    if provider == "cartesia":
+        tts = cartesia.TTS(model=tts_cfg.get("model", "sonic-3"), voice=english_voice, language="en")
+    elif provider == "inworld":
+        tts = inworld.TTS(voice=english_voice)
+    else:
+        tts = elevenlabs.TTS(voice_id=english_voice, model=tts_cfg.get("model", "eleven_turbo_v2_5"))
 
     # --- Connect + start session ---
     await ctx.connect()
