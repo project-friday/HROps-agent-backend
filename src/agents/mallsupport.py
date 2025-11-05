@@ -57,6 +57,7 @@ class MallSupportAgent(Agent):
                 model=tts_cfg.get("model", "sonic-3"),
                 voice=english_voice,
                 language="en",
+                speed=0.9,
             )
 
         # ---- Arabic (Cartesia) ----
