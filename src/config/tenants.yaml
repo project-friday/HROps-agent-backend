@@ -104,11 +104,11 @@ tenants:
         tts:
           model: "sonic-3"
           providers:
-            arabic: "cartesia"
+            arabic: "elevenlabs"
             english: "inworld"
             mandarin: "inworld"
           voices:
-            arabic: "6304c635-6681-4f9e-85b6-a97f4d26461a"  # Amira
+            arabic: "4wf10lgibMnboGJGCLrP"   #  Arabic voice
             english: "Sarah" #  Sarah
             mandarin: "Xinyi"   #  Xinyi
         greeting:   "Hello there! Hope Sarah helped you well! Could you please rate your experience of having conversation with her from one to five, where one is the lowest and five is the best?"

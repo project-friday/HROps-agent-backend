@@ -53,17 +53,17 @@ class SurveyAgent(Agent):
         else:
             raise RuntimeError("❌ No English Inworld voice configured")
 
-        # ---- Arabic (Cartesia) ----
+        # ---- Arabic (Elevenlabs) ----
         arabic_voice = voices.get("arabic")
         self.arabic_tts = None
-        if arabic_voice and providers.get("arabic", "cartesia") == "cartesia":
-            self.arabic_tts = cartesia.TTS(
-                model=tts_cfg.get("model", "sonic-3"),
-                voice=arabic_voice,
-                language="ar",
+        if arabic_voice and providers.get("arabic", "elevenlabs") == "elevenlabs":
+            self.arabic_tts = elevenlabs.TTS(
+                voice_id=arabic_voice,
+                model="eleven_turbo_v2_5",
             )
         else:
-            raise RuntimeError("❌ No Arabic Cartesia voice configured")
+            raise RuntimeError("❌ No Arabic ElevenLabs voice configured")
+
 
         # ---- Mandarin (Inworld) ----
         mandarin_voice = voices.get("mandarin")
