@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re  # ✅ added for script-based LLM language detection
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
 
@@ -24,13 +25,14 @@ from src.tools.mallsupport_tools import create_ticket, query_knowledge_base, fee
 logger = logging.getLogger("dubai-mall-support-agent")
 logger.setLevel(logging.INFO)
 
-
 def load_prompt(file_path: str) -> str:
     return Path(file_path).read_text(encoding="utf-8").strip()
 
-
 EVE_MALL_PROMPT = load_prompt("src/prompts/mallsupport.txt")
 
+# ✅ Regexes to infer language from the assistant's (LLM) reply text
+ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
+CJK_RE = re.compile(r"[\u4E00-\u9FFF]")
 
 class MallSupportAgent(Agent):
     """
@@ -44,6 +46,11 @@ class MallSupportAgent(Agent):
     def __init__(self, cfg: dict, room: rtc.Room, chat_ctx=None) -> None:
         self.room = room
         self.cfg = get_cfg()
+
+        # ✅ sane defaults so first TTS turn never crashes
+        self._user_language = "en"  # from STT (fallback)
+        self._llm_language = "en"   # from assistant reply (preferred)
+
         # ---------- TTS setup (multi-language) ----------
         tts_cfg = cfg.get("tts", {})
         voices = tts_cfg.get("voices", {})
@@ -205,6 +212,18 @@ class MallSupportAgent(Agent):
         # Capture final LLM response
         self.last_llm_response = "".join(buffer).strip()
 
+        # ✅ Infer language from *assistant's reply* (LLM) and prefer it for TTS
+        detected = "en"
+        resp = self.last_llm_response
+        if ARABIC_RE.search(resp):
+            detected = "ar"
+        elif CJK_RE.search(resp):
+            detected = "zh"
+
+        if detected != self._llm_language:
+            self._llm_language = detected
+            logger.info("🧠 LLM-selected language → %s", self._llm_language)
+
         # Execute queued tools and send results
         for action_name, tool_function, tool_args in pending_tools:
             if tool_function not in self.visible_tools:
@@ -233,7 +252,7 @@ class MallSupportAgent(Agent):
         audio: AsyncGenerator[rtc.AudioFrame, None],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[stt.SpeechEvent, None]:
-        """Track detected language (en/ar)."""
+        """Track detected language (en/ar/zh) from STT as a fallback."""
         print("🎤 Starting STT node for mall support...")
         activity = self._get_activity_or_raise()
         assert activity.stt is not None, "stt_node called but no STT node available"
@@ -261,9 +280,9 @@ class MallSupportAgent(Agent):
                         event.type == SpeechEventType.FINAL_TRANSCRIPT
                         and event.alternatives
                     ):
-                        # 👂 Capture language from user speech
+                        # 👂 Capture language from user speech (fallback only)
                         self._user_language = event.alternatives[0].language
-                        print("🌐 Detected language:", self._user_language)
+                        print("🌐 Detected language (STT):", self._user_language)
                     yield event
             finally:
                 await utils.aio.cancel_and_wait(forward_task)
@@ -274,17 +293,18 @@ class MallSupportAgent(Agent):
         model_settings: ModelSettings,
     ) -> AsyncGenerator[rtc.AudioFrame, None]:
         """
-        Dynamically choose  TTS voice based on detected STT language.
-
+        Choose TTS voice using LLM's inferred language if present,
+        else fall back to STT-detected language, else English.
         """
-        # 👂 Detect the last user language (default English)
-        lang = getattr(self, "_user_language", "en")
+        # ✅ Prefer LLM language (assistant reply) for speaking
+        lang = getattr(self, "_llm_language", None) or getattr(self, "_user_language", "en")
+
         if lang.startswith("ar"):
             print("🗣️ Using Arabic TTS voice")
             chosen_tts = self.arabic_tts
         elif lang.startswith("zh"):
             print("🗣️ Using Mandarin TTS voice")
-            chosen_tts = self.mandarin_tts
+            chosen_tts = self.mandarin_tts or self._get_activity_or_raise().tts  # graceful fallback
         else:
             activity = self._get_activity_or_raise()
             assert activity.tts is not None, "tts_node called but no TTS node is available"
