@@ -1,4 +1,3 @@
-# src/agents/assessment_agent.py
 from __future__ import annotations
 
 import asyncio
@@ -12,6 +11,7 @@ from livekit import rtc
 from livekit.agents import llm
 from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import assemblyai, elevenlabs, openai, silero
+from src.utils.tts_sanitizer import sanitize_for_tts  # ✅ for clear email/number read-backs
 
 # ---- Import assessment tools ----
 from src.tools.assessment_agent import (
@@ -78,8 +78,6 @@ class AssessmentAgent(Agent):
 
         # keys that should be filtered out from tool results before sending to frontend
         self.tool_result_filters = {
-            # check_assessment_status: ["status", "deadline", "submitted_at", "score"],
-            # reschedule_assessment: ["new_deadline"],
             get_assessment_details: ["instructions", "duration", "score", "result"],
             get_assessment_result: ["submitted_at"],
             escalate_to_assessment_team: ["success"],
@@ -134,7 +132,7 @@ class AssessmentAgent(Agent):
         tools: list[llm.FunctionTool | llm.RawFunctionTool],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[llm.ChatChunk | str, None]:
-        """Custom LLM node that captures full response text."""
+        """Custom LLM node that captures full response text and sanitizes TTS read-backs."""
 
         activity = self._get_activity_or_raise()
         assert activity.llm is not None, "llm_node called but no LLM node is available"
@@ -157,6 +155,9 @@ class AssessmentAgent(Agent):
                 if isinstance(chunk, str):
                     buffer.append(chunk)
                     print("🤖 LLM str chunk:", chunk)
+                    # ✅ Speak sanitized string so dots/@/digits/initials are audible
+                    yield sanitize_for_tts(chunk)
+                    continue
 
                 elif isinstance(chunk, llm.ChatChunk):
                     if chunk.delta and chunk.delta.content:
@@ -174,9 +175,7 @@ class AssessmentAgent(Agent):
                                 try:
                                     tool_args = json.loads(tool_args)
                                 except json.JSONDecodeError:
-                                    print(
-                                        f"⚠️ Invalid JSON for {tool_name}: {tool_args}"
-                                    )
+                                    print(f"⚠️ Invalid JSON for {tool_name}: {tool_args}")
                                     tool_args = {}
 
                             tool_function = None
@@ -193,7 +192,18 @@ class AssessmentAgent(Agent):
                                     (action_name, tool_function, tool_args)
                                 )
 
-                yield chunk
+                        # For tool-calls, pass raw chunk (don’t sanitize schema)
+                        yield chunk
+                        continue
+
+                    # Otherwise sanitize spoken content
+                    if chunk.delta and chunk.delta.content:
+                        yield sanitize_for_tts(chunk.delta.content)
+                        continue
+
+                    # Fallback
+                    yield chunk
+                    continue
 
         # Capture final LLM response
         self.last_llm_response = "".join(buffer).strip()
