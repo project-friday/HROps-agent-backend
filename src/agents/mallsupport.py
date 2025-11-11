@@ -11,6 +11,7 @@ from livekit import rtc
 from livekit.agents import llm, stt, tokenize, tts, utils
 from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
+from livekit.agents.voice.background_audio import BackgroundAudioPlayer, AudioConfig, BuiltinAudioClip
 
 # Plugins
 from livekit.plugins import azure, elevenlabs, openai, silero, soniox, cartesia
@@ -49,16 +50,27 @@ class MallSupportAgent(Agent):
         voices = tts_cfg.get("voices", {})
         providers = tts_cfg.get("providers", {})
 
-        # ---- English (Cartesia) ----
+        # ---- English (ElevenLabs) ----
         english_voice = voices.get("english")
         self.english_tts = None
-        if english_voice and providers.get("english", "cartesia") == "cartesia":
-            self.english_tts = cartesia.TTS(
-                model=tts_cfg.get("model", "sonic-3"),
-                voice=english_voice,
-                language="en",
-                speed=0.9,
+        if english_voice and providers.get("english", "elevenlabs") == "elevenlabs":
+            self.english_tts = elevenlabs.TTS(
+                voice_id="H8bdWZHK2OgZwTN7ponr",
+                model="eleven_turbo_v2_5",
             )
+        else:
+            raise RuntimeError("❌ No English ElevenLabs voice configured")
+
+        # # ---- English (Cartesia) ----
+        # english_voice = voices.get("english")
+        # self.english_tts = None
+        # if english_voice and providers.get("english", "cartesia") == "cartesia":
+        #     self.english_tts = cartesia.TTS(
+        #         model=tts_cfg.get("model", "sonic-3"),
+        #         voice=english_voice,
+        #         language="en",
+        #         speed=0.8,
+        #     )
 
         # ---- Arabic (Cartesia) ----
         arabic_voice = voices.get("arabic")
@@ -67,6 +79,7 @@ class MallSupportAgent(Agent):
                 model=tts_cfg.get("model", "sonic-3"),
                 voice=arabic_voice,
                 language="ar",
+                volume=2, 
             )
         else:
             raise RuntimeError("❌ No Arabic Cartesia voice configured")
@@ -86,9 +99,10 @@ class MallSupportAgent(Agent):
                 params=soniox.STTOptions(language_hints=["en", "ar", "zh"]),
                 vad=silero.VAD.load(min_speech_duration=0.1),
             ),
+            tts=self.english_tts,
             # tts=elevenlabs.TTS(
             #     voice_id="H8bdWZHK2OgZwTN7ponr",
-            #     model="eleven_multilingual_v2",
+            #     model="eleven_turbo_v2_5",
             # ),
             tools=[query_knowledge_base, create_ticket, handover_to_survey, feedback_sms_tool],
             chat_ctx=chat_ctx,
@@ -117,6 +131,7 @@ class MallSupportAgent(Agent):
         }
 
         self.visible_tools = {create_ticket, feedback_sms_tool}
+        self.manual_language = None  # tracks manually switched language
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -263,7 +278,30 @@ class MallSupportAgent(Agent):
                     ):
                         # 👂 Capture language from user speech
                         self._user_language = event.alternatives[0].language
+                        text = event.alternatives[0].text.lower().strip()
                         print("🌐 Detected language:", self._user_language)
+                        cfg = get_cfg()
+                        switch_cfg = cfg["agents"]["MallSupportAgent"]["language_switch"]
+
+                        lang_map = {
+                            "arabic": ("ar", switch_cfg.get("arabic", {})),
+                            "chinese": ("zh", switch_cfg.get("mandarin", {})),
+                            "mandarin": ("zh", switch_cfg.get("mandarin", {})),
+                        }
+
+                        for keyword, (lang_code, cfg) in lang_map.items():
+                            if keyword in text:
+                                await self.session.say(cfg.get("notice"))
+                                await asyncio.sleep(0.8)
+                                self.manual_language = self._user_language = lang_code
+                                self.background_audio = BackgroundAudioPlayer(
+                                    ambient_sound=AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8),
+                                )
+                                await self.background_audio.start(room=self.room, agent_session=self.session)
+                                await asyncio.sleep(2.0)
+                                await self.background_audio.aclose()
+                                await self.session.say(cfg.get("greeting", ""))
+                                break
                     yield event
             finally:
                 await utils.aio.cancel_and_wait(forward_task)
@@ -277,8 +315,10 @@ class MallSupportAgent(Agent):
         Dynamically choose  TTS voice based on detected STT language.
 
         """
-        # 👂 Detect the last user language (default English)
-        lang = getattr(self, "_user_language", "en")
+        lang = self.manual_language or getattr(self, "_user_language", "en")
+        if self.manual_language == "en":
+            self._user_language = "en"
+
         if lang.startswith("ar"):
             print("🗣️ Using Arabic TTS voice")
             chosen_tts = self.arabic_tts
@@ -316,5 +356,6 @@ class MallSupportAgent(Agent):
 
     async def on_enter(self):
         cfg = get_cfg()
+        self.manual_language = "en"
         """Speaks immediately after the agent becomes active."""
         await self.session.say(cfg["greeting"])
