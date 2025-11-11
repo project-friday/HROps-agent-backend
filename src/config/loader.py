@@ -91,6 +91,7 @@ def get_cfg() -> dict:
                     ),
                 ),
                 "greeting": agent_def.get("greeting", tenant_cfg.get("greeting", "")),
+                "language_switch": agent_def.get("language_switch", {}),
             }
 
             # --- Voice resolution ---
