@@ -245,7 +245,7 @@ class SurveyAgent(Agent):
         model_settings: ModelSettings,
     ) -> AsyncGenerator[rtc.AudioFrame, None]:
         """Switch TTS voice dynamically based on detected language."""
-        lang = getattr(self, "_user_language", "en")
+        lang = getattr(self.session, "state", {}).get("language") or getattr(self, "_user_language", "en")
 
         if lang.startswith("ar"):
             print("🗣️ Using Arabic survey TTS")
@@ -283,6 +283,8 @@ class SurveyAgent(Agent):
     async def on_enter(self):
         """Speak greeting when the survey starts."""
         cfg = get_cfg()
-        greeting = cfg["agents"]["SurveyAgent"].get("greeting")
-        if greeting:
-            await self.session.say(greeting)
+        lang = getattr(self.session, "state", {}).get("language", "en")
+        survey_cfg = cfg["agents"]["SurveyAgent"]["greeting"]
+        # Default to English if language not found
+        greeting = survey_cfg.get(lang[:2], survey_cfg.get("en"))
+        await self.session.say(greeting)
