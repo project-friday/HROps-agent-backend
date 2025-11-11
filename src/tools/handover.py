@@ -74,6 +74,9 @@ async def handover_to_survey(context: RunContext[dict]):
     current_agent = context.session.current_agent
     cfg = current_agent.cfg  # full tenant config already loaded
 
+    user_lang = getattr(current_agent, "_user_language", "en")
+    context.session.state = {**getattr(context.session, "state", {}), "language": user_lang}
+
     # get the SurveyAgent-specific config from the same tenant config
     survey_cfg = cfg["agents"].get("SurveyAgent")
     if not survey_cfg:
@@ -88,6 +91,19 @@ async def handover_to_survey(context: RunContext[dict]):
         ),
     )
 
+@function_tool(description="Handover to Amira, Arabic-speaking agent.")
+async def handover_to_arabic(context: RunContext[dict]):
+    """Transfers the call to Amira (Arabic-speaking agent) safely."""
+    from src.config.loader import get_cfg
+    from src.agents.mallsupport import MallSupportAgent
+
+    tenant_cfg = get_cfg()
+    agent_cfg = tenant_cfg["agents"].get("ArabicMallAgent")
+    if not agent_cfg:
+        raise RuntimeError("❌ ArabicMallAgent not found in tenant config")
+
+    await context.session.say("Sure, in that case let me transfer this call to someone who can assist you in Arabic.")
+    await context.session.handover(to=MallSupportAgent(cfg=agent_cfg, room=context.session.room))
 
 def get_handover_tools(agent: str) -> list:
     """
