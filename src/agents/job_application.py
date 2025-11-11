@@ -7,6 +7,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
+from src.utils.tts_sanitizer import sanitize_for_tts  # ✅ used in stream to fix read-backs
 
 import aiofiles
 
@@ -88,7 +89,7 @@ class JobApplicationAgent(Agent):
             "Fetching Interview Details": get_upcoming_interview,
             "Checking Interview Availability": check_interview_availability,
             "Rescheduling Interview": reschedule_interview,
-            "Creating Ticket": create_case_record
+            "Creating Ticket": create_case_record,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
         self.tool_result_filters = {
@@ -154,8 +155,7 @@ class JobApplicationAgent(Agent):
         tools: list[llm.FunctionTool | llm.RawFunctionTool],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[llm.ChatChunk | str, None]:
-        """Custom LLM node that captures full response text."""
-
+        """Custom LLM node that captures full response text and sanitizes TTS read-backs."""
         activity = self._get_activity_or_raise()
         assert activity.llm is not None, "llm_node called but no LLM node is available"
         assert isinstance(activity.llm, llm.LLM)
@@ -173,15 +173,21 @@ class JobApplicationAgent(Agent):
             tool_choice=tool_choice,
             conn_options=conn_options,
         ) as stream:
+            # 🔊 SANITIZED STREAMING: speak emails/numbers/punctuation clearly for TTS
             async for chunk in stream:
                 if isinstance(chunk, str):
                     buffer.append(chunk)
                     print("🤖 LLM str chunk:", chunk)
+                    # Speak the sanitized string so dots/@/digits/initials are audible
+                    yield sanitize_for_tts(chunk)
+                    continue
 
                 elif isinstance(chunk, llm.ChatChunk):
+                    # Accumulate any text content
                     if chunk.delta and chunk.delta.content:
                         buffer.append(chunk.delta.content)
 
+                    # If the chunk carries tool calls, queue them, pass the chunk through unchanged
                     if chunk.delta and chunk.delta.tool_calls:
                         print("🛠️ Tool calls:", chunk.delta.tool_calls)
 
@@ -194,9 +200,7 @@ class JobApplicationAgent(Agent):
                                 try:
                                     tool_args = json.loads(tool_args)
                                 except json.JSONDecodeError:
-                                    print(
-                                        f"⚠️ Invalid JSON for {tool_name}: {tool_args}"
-                                    )
+                                    print(f"⚠️ Invalid JSON for {tool_name}: {tool_args}")
                                     tool_args = {}
 
                             tool_function = None
@@ -212,11 +216,20 @@ class JobApplicationAgent(Agent):
                                 await self._send_websocket_message(action_name)
 
                                 # Queue tool execution after LLM finishes
-                                pending_tools.append(
-                                    (action_name, tool_function, tool_args)
-                                )
+                                pending_tools.append((action_name, tool_function, tool_args))
 
-                yield chunk
+                        # For tool-calls, pass the raw chunk (don’t sanitize to avoid breaking tool schema)
+                        yield chunk
+                        continue
+
+                    # Otherwise, if this is just text content → sanitize before speaking
+                    if chunk.delta and chunk.delta.content:
+                        yield sanitize_for_tts(chunk.delta.content)
+                        continue
+
+                    # Fallback (non-text delta)
+                    yield chunk
+                    continue
 
         # Capture final LLM response
         self.last_llm_response = "".join(buffer).strip()

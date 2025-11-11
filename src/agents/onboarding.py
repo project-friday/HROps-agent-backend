@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 from cmath import log
@@ -10,6 +12,7 @@ from livekit import rtc
 from livekit.agents import ChatContext, llm
 from livekit.agents.voice import Agent, ModelSettings
 from livekit.plugins import assemblyai, elevenlabs, openai, silero
+from src.utils.tts_sanitizer import sanitize_for_tts  # ✅ for clear email/number read-backs
 
 from src.tools.handover import get_handover_tools
 from src.tools.onboarding_agent import (
@@ -93,7 +96,7 @@ class OnboardingAgent(Agent):
             "Logging Negotiation": log_negotiation,
             "Notifying Onboarding Team": escalate_to_onboarding_team,
             "Submitting Deferral Request": mark_deferral,
-            "Creating Ticket" : create_case_record,
+            "Creating Ticket": create_case_record,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
@@ -105,7 +108,6 @@ class OnboardingAgent(Agent):
             log_negotiation: ["raw_email"],
             get_background_verification_status: ["remarks", "link", "dispute_info"],
             create_case_record: ["success", "case_number"],
-            # avoid exposing internals
         }
         self.email_tools = {
             log_negotiation,
@@ -177,7 +179,7 @@ class OnboardingAgent(Agent):
         tools: list[llm.FunctionTool | llm.RawFunctionTool],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[llm.ChatChunk | str, None]:
-        """Custom LLM node that captures response and tool usage like JobApplicationAgent."""
+        """Custom LLM node that captures response, queues tools, and sanitizes TTS read-backs."""
         activity = self._get_activity_or_raise()
         assert activity.llm is not None, "llm_node called but no LLM node is available"
         assert isinstance(activity.llm, llm.LLM)
@@ -199,6 +201,9 @@ class OnboardingAgent(Agent):
                 if isinstance(chunk, str):
                     buffer.append(chunk)
                     print("🤖 LLM str chunk:", chunk)
+                    # ✅ Speak sanitized string so dots/@/digits/initials are audible
+                    yield sanitize_for_tts(chunk)
+                    continue
 
                 elif isinstance(chunk, llm.ChatChunk):
                     if chunk.delta and chunk.delta.content:
@@ -215,9 +220,7 @@ class OnboardingAgent(Agent):
                                 try:
                                     tool_args = json.loads(tool_args)
                                 except json.JSONDecodeError:
-                                    print(
-                                        f"⚠️ Invalid JSON for {tool_name}: {tool_args}"
-                                    )
+                                    print(f"⚠️ Invalid JSON for {tool_name}: {tool_args}")
                                     tool_args = {}
 
                             tool_function = None
@@ -234,7 +237,18 @@ class OnboardingAgent(Agent):
                                     (action_name, tool_function, tool_args)
                                 )
 
-                yield chunk
+                        # For tool-calls, pass raw chunk (don’t sanitize schema)
+                        yield chunk
+                        continue
+
+                    # Otherwise sanitize spoken content
+                    if chunk.delta and chunk.delta.content:
+                        yield sanitize_for_tts(chunk.delta.content)
+                        continue
+
+                    # Fallback
+                    yield chunk
+                    continue
 
         # Final LLM response
         self.last_llm_response = "".join(buffer).strip()
@@ -244,7 +258,6 @@ class OnboardingAgent(Agent):
         for action_name, tool_function, tool_args in pending_tools:
             if tool_function not in self.visible_tools:
                 print(f"🚫 Skipping execution of {action_name} (not visible)")
-
                 continue
 
             if tool_function in self.email_tools:
