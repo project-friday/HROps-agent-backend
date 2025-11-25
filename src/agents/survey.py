@@ -1,4 +1,4 @@
-# src/agents/mallsupport_agent.py
+# src/agents/survey_agent.py
 from __future__ import annotations
 
 import asyncio
@@ -11,18 +11,14 @@ from livekit import rtc
 from livekit.agents import llm, stt, tokenize, tts, utils
 from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
-from livekit.agents.voice.background_audio import BackgroundAudioPlayer, AudioConfig, BuiltinAudioClip
 
 # Plugins
-from livekit.plugins import azure, elevenlabs, openai, silero, soniox, cartesia
+from livekit.plugins import elevenlabs, silero, soniox, cartesia, inworld
 
 from src.config.loader import get_cfg
-from src.tools.handover import handover_to_survey
+from src.tools.survey_tools import feedback_call_tool, feedback_sms_tool
 
-# ---- Import only the knowledge base tool ----
-from src.tools.mallsupport_tools import create_ticket, query_knowledge_base, feedback_sms_tool
-
-logger = logging.getLogger("dubai-mall-support-agent")
+logger = logging.getLogger("dubai-mall-survey-agent")
 logger.setLevel(logging.INFO)
 
 
@@ -30,16 +26,15 @@ def load_prompt(file_path: str) -> str:
     return Path(file_path).read_text(encoding="utf-8").strip()
 
 
-EVE_MALL_PROMPT = load_prompt("src/prompts/mallsupport.txt")
+EVE_SURVEY_PROMPT = load_prompt("src/prompts/survey.txt")
 
 
-class MallSupportAgent(Agent):
+class SurveyAgent(Agent):
     """
-    Dubai Mall Customer Support Agent:
-    - Handles queries from customers
-    - Single tool: query_knowledge_base
-    - RAG-based answers for knowledge base
-    - Keeps responses concise and polite
+    Dubai Mall Survey Agent:
+    - Conducts customer satisfaction surveys
+    - Handles multilingual (English/Arabic) interactions
+    - Switches TTS dynamically based on detected speech language
     """
 
     def __init__(self, cfg: dict, room: rtc.Room, chat_ctx=None) -> None:
@@ -50,100 +45,73 @@ class MallSupportAgent(Agent):
         voices = tts_cfg.get("voices", {})
         providers = tts_cfg.get("providers", {})
 
-        # ---- English (ElevenLabs) ----
+        # ---- English (Inworld Sarah) ----
         english_voice = voices.get("english")
         self.english_tts = None
-        if english_voice and providers.get("english", "elevenlabs") == "elevenlabs":
-            self.english_tts = elevenlabs.TTS(
-                voice_id="H8bdWZHK2OgZwTN7ponr",
+        if english_voice and providers.get("english", "inworld") == "inworld":
+            self.english_tts = inworld.TTS(voice=english_voice)
+        else:
+            raise RuntimeError("❌ No English Inworld voice configured")
+
+        # ---- Arabic (Elevenlabs) ----
+        arabic_voice = voices.get("arabic")
+        self.arabic_tts = None
+        if arabic_voice and providers.get("arabic", "elevenlabs") == "elevenlabs":
+            self.arabic_tts = elevenlabs.TTS(
+                voice_id=arabic_voice,
                 model="eleven_turbo_v2_5",
             )
         else:
-            raise RuntimeError("❌ No English ElevenLabs voice configured")
+            raise RuntimeError("❌ No Arabic ElevenLabs voice configured")
 
-        # # ---- English (Cartesia) ----
-        # english_voice = voices.get("english")
-        # self.english_tts = None
-        # if english_voice and providers.get("english", "cartesia") == "cartesia":
-        #     self.english_tts = cartesia.TTS(
-        #         model=tts_cfg.get("model", "sonic-3"),
-        #         voice=english_voice,
-        #         language="en",
-        #         speed=0.8,
-        #     )
-
-        # ---- Arabic (Cartesia) ----
-        arabic_voice = voices.get("arabic")
-        if arabic_voice and providers.get("arabic", "cartesia") == "cartesia":
-            self.arabic_tts = cartesia.TTS(
-                model=tts_cfg.get("model", "sonic-3"),
-                voice=arabic_voice,
-                language="ar",
-                volume=2, 
-            )
-        else:
-            raise RuntimeError("❌ No Arabic Cartesia voice configured")
 
         # ---- Mandarin (Inworld) ----
         mandarin_voice = voices.get("mandarin")
         self.mandarin_tts = None
-        if mandarin_voice:
-            if providers.get("mandarin") == "inworld":
-                from livekit.plugins import inworld
-                self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
+        if mandarin_voice and providers.get("mandarin") == "inworld":
+            self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
+        else:
+            raise RuntimeError("❌ No Mandarin Inworld voice configured")
 
-        # self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
         super().__init__(
-            instructions=EVE_MALL_PROMPT,
+            instructions=EVE_SURVEY_PROMPT,
             stt=soniox.STT(
                 params=soniox.STTOptions(language_hints=["en", "ar", "zh"]),
                 vad=silero.VAD.load(min_speech_duration=0.1),
             ),
-            tts=self.english_tts,
-            # tts=elevenlabs.TTS(
-            #     voice_id="H8bdWZHK2OgZwTN7ponr",
-            #     model="eleven_turbo_v2_5",
-            # ),
-            tools=[query_knowledge_base, create_ticket, handover_to_survey, feedback_sms_tool],
+            tools=[feedback_call_tool, feedback_sms_tool],
             chat_ctx=chat_ctx,
         )
 
+        # --- Tool actions ---
         self.actions = {
-            "Query Knowledge Base": query_knowledge_base,
-            "Creating ticket": create_ticket,
-            "Handover to Survey": handover_to_survey,
-            "Send Feedback SMS": feedback_sms_tool,
+            "Feedback Rating": feedback_call_tool,
+            "Feedback SMS": feedback_sms_tool,
+            # "Submit Survey Response": submit_survey_response,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
-        # Optional: keys to filter from tool results before sending
+        self.visible_tools = {feedback_call_tool, feedback_sms_tool}
+
         self.tool_result_filters = {
-            query_knowledge_base: ["internal_id", "metadata"],
-            create_ticket: ["ticket_id"],
+            feedback_call_tool: [],
             feedback_sms_tool: [],
         }
 
         self.tool_cards = {
-            query_knowledge_base: "knowledge_base_result",
-            create_ticket: "ticket_creation_result",
-            handover_to_survey: "survey_handover",
-            feedback_sms_tool: "feedback_sms_sent",
+            feedback_call_tool: "feedback_call_result",
+            feedback_sms_tool: "feedback_sms_result",
         }
-
-        self.visible_tools = {create_ticket, feedback_sms_tool}
-        self.manual_language = None  # tracks manually switched language
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
     ):
-        """Send WebSocket message with action, filtered result, and card_name."""
         message = {"action": action}
 
         if result is not None:
             if tool_func in self.tool_result_filters:
                 for key in self.tool_result_filters[tool_func]:
                     result.pop(key, None)
-
             message["result"] = result
             message["card_name"] = self.tool_cards.get(tool_func, "generic")
 
@@ -161,10 +129,9 @@ class MallSupportAgent(Agent):
         tools: list[llm.FunctionTool | llm.RawFunctionTool],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[llm.ChatChunk | str, None]:
-        """Custom LLM node that captures full response text and executes tools."""
-
+        """Capture LLM outputs and execute tools with arguments."""
         activity = self._get_activity_or_raise()
-        assert activity.llm is not None, "llm_node called but no LLM node is available"
+        assert activity.llm is not None, "llm_node called but no LLM node available"
         assert isinstance(activity.llm, llm.LLM)
 
         tool_choice = model_settings.tool_choice if model_settings else llm.NOT_GIVEN
@@ -183,24 +150,23 @@ class MallSupportAgent(Agent):
             async for chunk in stream:
                 if isinstance(chunk, str):
                     buffer.append(chunk)
-
                 elif isinstance(chunk, llm.ChatChunk):
                     if chunk.delta and chunk.delta.content:
                         buffer.append(chunk.delta.content)
 
+                    # 🟢 Detect when the LLM triggers a tool call
                     if chunk.delta and chunk.delta.tool_calls:
                         for tool_call in chunk.delta.tool_calls:
                             tool_name = tool_call.name
                             tool_args = tool_call.arguments or "{}"
+
                             if isinstance(tool_args, str):
                                 try:
                                     tool_args = json.loads(tool_args)
                                 except json.JSONDecodeError:
-                                    logger.warning(
-                                        "Invalid JSON for %s: %s", tool_name, tool_args
-                                    )
                                     tool_args = {}
 
+                            # Match the function by name
                             tool_function = None
                             action_name = None
                             for name, func in self.actions.items():
@@ -217,15 +183,11 @@ class MallSupportAgent(Agent):
 
                 yield chunk
 
-        # Capture final LLM response
         self.last_llm_response = "".join(buffer).strip()
 
-        # Execute queued tools and send results
         for action_name, tool_function, tool_args in pending_tools:
             if tool_function not in self.visible_tools:
-                logger.info("Skipping execution of %s (not visible)", action_name)
                 continue
-
             try:
                 if asyncio.iscoroutinefunction(tool_function):
                     result = await tool_function(**tool_args)
@@ -235,37 +197,32 @@ class MallSupportAgent(Agent):
                 await self._send_websocket_message(
                     action_name, result, tool_func=tool_function
                 )
-                logger.info("Sent result for %s: %s", action_name, result)
-
             except Exception as e:
                 await self._send_websocket_message(
                     action_name, {"error": str(e)}, tool_func=tool_function
                 )
-                logger.error("Tool execution failed for %s: %s", action_name, e)
+
 
     async def stt_node(
         self,
         audio: AsyncGenerator[rtc.AudioFrame, None],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[stt.SpeechEvent, None]:
-        """Track detected language (en/ar)."""
-        print("🎤 Starting STT node for mall support...")
+        """Detect language (en/ar) for dynamic TTS switching."""
+        print("🎤 Starting STT node for survey agent...")
         activity = self._get_activity_or_raise()
         assert activity.stt is not None, "stt_node called but no STT node available"
 
         wrapped_stt = activity.stt
-        if not activity.stt.capabilities.streaming:
+        if not wrapped_stt.capabilities.streaming:
             if not activity.vad:
-                raise RuntimeError(
-                    f"The STT ({activity.stt.label}) does not support streaming, add a VAD"
-                )
+                raise RuntimeError("STT requires a VAD for non-streaming mode")
             wrapped_stt = stt.StreamAdapter(stt=wrapped_stt, vad=activity.vad)
 
-        conn_options = activity.session.conn_options.stt_conn_options
-        async with wrapped_stt.stream(conn_options=conn_options) as stream:
+        async with wrapped_stt.stream() as stream:
 
             @utils.log_exceptions()
-            async def _forward_input() -> None:
+            async def _forward_input():
                 async for frame in audio:
                     stream.push_frame(frame)
 
@@ -276,32 +233,8 @@ class MallSupportAgent(Agent):
                         event.type == SpeechEventType.FINAL_TRANSCRIPT
                         and event.alternatives
                     ):
-                        # 👂 Capture language from user speech
                         self._user_language = event.alternatives[0].language
-                        text = event.alternatives[0].text.lower().strip()
-                        print("🌐 Detected language:", self._user_language)
-                        cfg = get_cfg()
-                        switch_cfg = cfg["agents"]["MallSupportAgent"]["language_switch"]
-
-                        lang_map = {
-                            "arabic": ("ar", switch_cfg.get("arabic", {})),
-                            "chinese": ("zh", switch_cfg.get("mandarin", {})),
-                            "mandarin": ("zh", switch_cfg.get("mandarin", {})),
-                        }
-
-                        for keyword, (lang_code, cfg) in lang_map.items():
-                            if keyword in text:
-                                await self.session.say(cfg.get("notice"))
-                                await asyncio.sleep(0.8)
-                                self.manual_language = self._user_language = lang_code
-                                self.background_audio = BackgroundAudioPlayer(
-                                    ambient_sound=AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8),
-                                )
-                                await self.background_audio.start(room=self.room, agent_session=self.session)
-                                await asyncio.sleep(2.0)
-                                await self.background_audio.aclose()
-                                await self.session.say(cfg.get("greeting", ""))
-                                break
+                        print("🌐 Detected survey language:", self._user_language)
                     yield event
             finally:
                 await utils.aio.cancel_and_wait(forward_task)
@@ -311,24 +244,18 @@ class MallSupportAgent(Agent):
         text: AsyncGenerator[str, None],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[rtc.AudioFrame, None]:
-        """
-        Dynamically choose  TTS voice based on detected STT language.
-
-        """
-        lang = self.manual_language or getattr(self, "_user_language", "en")
-        if self.manual_language == "en":
-            self._user_language = "en"
+        """Switch TTS voice dynamically based on detected language."""
+        lang = getattr(self.session, "state", {}).get("language") or getattr(self, "_user_language", "en")
 
         if lang.startswith("ar"):
-            print("🗣️ Using Arabic TTS voice")
+            print("🗣️ Using Arabic survey TTS")
             chosen_tts = self.arabic_tts
         elif lang.startswith("zh"):
-            print("🗣️ Using Mandarin TTS voice")
+            print("🗣️ Using Mandarin survey TTS")
             chosen_tts = self.mandarin_tts
         else:
-            activity = self._get_activity_or_raise()
-            assert activity.tts is not None, "tts_node called but no TTS node is available"
-            chosen_tts = activity.tts
+            print("🗣️ Using English survey TTS")
+            chosen_tts = self.english_tts
 
         wrapped_tts = chosen_tts
         if not chosen_tts.capabilities.streaming:
@@ -339,8 +266,7 @@ class MallSupportAgent(Agent):
                 ),
             )
 
-        conn_options = self.session.conn_options.tts_conn_options
-        async with wrapped_tts.stream(conn_options=conn_options) as stream:
+        async with wrapped_tts.stream() as stream:
 
             async def _forward_input():
                 async for chunk in text:
@@ -355,7 +281,10 @@ class MallSupportAgent(Agent):
                 await asyncio.wait([forward_task])
 
     async def on_enter(self):
+        """Speak greeting when the survey starts."""
         cfg = get_cfg()
-        self.manual_language = "en"
-        """Speaks immediately after the agent becomes active."""
-        await self.session.say(cfg["greeting"])
+        lang = getattr(self.session, "state", {}).get("language", "en")
+        survey_cfg = cfg["agents"]["SurveyAgent"]["greeting"]
+        # Default to English if language not found
+        greeting = survey_cfg.get(lang[:2], survey_cfg.get("en"))
+        await self.session.say(greeting)

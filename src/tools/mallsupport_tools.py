@@ -2,6 +2,7 @@ import json
 import os
 import random
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -114,3 +115,31 @@ async def query_knowledge_base(question: str, top_k: int = 4) -> dict:
     )
 
     return {"answer": stitched, "snippets": snippets}
+
+
+@function_tool(description="Create ticket for any issue reported by customer.")
+async def create_ticket(phone_number: int, issue_description: str) -> dict:
+    ticket_id = time.strftime("ticket_%Y-%m-%d_%H-%M-%S")
+    ticket = {
+        "ticket_id": ticket_id,
+        "phone": phone_number,
+        "issue_description": issue_description,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "status": "Emergency" if "EMERGENCY" in issue_description.upper() else "Open",
+    }
+
+    return ticket
+
+@function_tool(description="Send feedback SMS link when customer declines to rate on the call.")
+async def feedback_sms_tool(phone_number: str) -> dict:
+    """UI-only tool – shows confirmation on screen when feedback SMS is sent."""
+    link = "https://feedback.thedubaimall.ae/rate"
+    sms = {
+        "phone_number": phone_number,
+        "message": (
+            f"Dubai Mall Concierge: Thank you for calling! We value your feedback. "
+            f"Please rate your experience here: {link}"
+        ),
+        "sent_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    }
+    return sms

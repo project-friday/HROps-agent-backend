@@ -61,22 +61,58 @@ tenants:
         english_voice: "xctasy8XvGp2cVO9HL9k"   
   emaar:
     company_name: "Emaar (Dubai Mall)"
-    greeting: "Hello, this is Eve from Dubai Mall Customer Support. How may I assist you today?"
+    greeting: "Hello! This is Sarah speaking from Dubai Mall Customer Support. Before we start, are you comfortable in English, or would you prefer speaking in Arabic or Chinese?"
+
     llm:
       model: "gpt-4.1"
       temperature: 0.1
+
     flows:
       default:
-        enabled_agents: ["CustomerSupport"]
-    stt:
-      provider: "deepgram"
-      language_code: "en-US"
-      endpointing_ms: 200
-    tts:
-      provider: "elevenlabs"
-      model: "eleven_turbo_v2_5"
-    voices:
-      english: "xctasy8XvGp2cVO9HL9k"
-      arabic: "SAFQ2n7Y1rFJ7LZg2b9R"
-        # for Deepgram/ElevenLabs
+        enabled_agents: ["MallSupportAgent", "SurveyAgent"]
+
+    agents:
+      MallSupportAgent:
+        stt:
+          provider: "deepgram"
+          language_code: "en"
+          endpointing_ms: 100
+        tts:
+          model: "sonic-3"
+          providers:
+            arabic: "cartesia"
+            english: "elevenlabs"
+            mandarin: "inworld"
+          voices:
+            arabic: "6304c635-6681-4f9e-85b6-a97f4d26461a"  # Amira
+            english: "H8bdWZHK2OgZwTN7ponr" # Need to use Saavi H8bdWZHK2OgZwTN7ponr  9626c31c-bec5-4cca-baa8-f8ba9e84c8bc
+            mandarin: "Jing"   # Jing         
+        language_switch:
+          arabic:
+            notice: "Sure, in that case let me transfer this call to someone who can assist you in Arabic."
+            greeting: "مرحبًا! أنا أميرة من دعم عملاء دبي مول. كيف يمكنني مساعدتك اليوم؟"
+          mandarin:
+            notice: "Sure, in that case let me transfer this call to someone who can assist you in Chinese."
+            greeting: "你好！我是晶晶，来自迪拜购物中心客户支持。请问我能帮您什么？"
+
+      SurveyAgent:
+        stt:
+          provider: "deepgram"
+          language_code: "en"
+          endpointing_ms: 150
+        tts:
+          model: "sonic-3"
+          providers:
+            arabic: "elevenlabs"
+            english: "inworld"
+            mandarin: "inworld"
+          voices:
+            arabic: "4wf10lgibMnboGJGCLrP"   #  Arabic voice
+            english: "Sarah" #  Sarah
+            mandarin: "Xinyi"   #  Xinyi
+        greeting:
+          en: "Hello there! Hope Sarah helped you well! Could you please rate your experience of having conversation with her from one to five, where one is the lowest and five is the best?"
+          ar: "مرحباً! نأمل أن سارة قدّمت لك المساعدة بشكل جيد. هل يمكنك تقييم تجربتك في التحدث معها من واحد إلى خمسة، حيث واحد هو الأدنى وخمسة هو الأفضل؟"
+          zh: "你好！我希望 Sarah 对你有所帮助。请你为与她的对话体验打个分，从一到五评分，其中一分为最低，五分为最好。"
+          # for Deepgram/ElevenLabs
 

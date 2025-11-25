@@ -5,7 +5,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession, room_io
-from livekit.plugins import elevenlabs, noise_cancellation, openai, silero
+from livekit.plugins import (
+    azure,
+    elevenlabs,
+    noise_cancellation,
+    openai,
+    silero,
+    soniox,
+    cartesia,
+    inworld,
+)
 
 from src.agents.router import RouterAgent
 from src.agents.translator import TranslatorAgent
@@ -81,27 +90,47 @@ async def create_hr_session(ctx: JobContext):
     )
 
 
-# --- Emaar (Dubai Mall) support session ---
 async def create_mallsupport_session(ctx: JobContext):
-    """Start a session for the Emaar Dubai Mall Support Agent."""
-    from src.agents.mallsupport import MallSupportAgent  # your custom agent
+    """Start a session for the Emaar Dubai Mall Support Agent (English voice only)."""
+    from src.agents.mallsupport import MallSupportAgent
     from src.config.loader import get_cfg
 
-    cfg = get_cfg()  # includes tenant config (no language section, has voices + llm)
+    # --- Load tenant + agent config ---
+    cfg = get_cfg()
+    agent_cfg = cfg["agents"]["MallSupportAgent"]
 
-    llm_cfg = cfg["llm"]
-    tts_cfg = cfg["tts"]
+    # --- LLM setup ---
+    llm_cfg = agent_cfg["llm"]
+    llm = openai.LLM(
+        model=llm_cfg.get("model"),
+        temperature=llm_cfg.get("temperature"),
+    )
 
-    # Load LLM + VAD
-    llm = openai.LLM(model=llm_cfg.get("model"), temperature=llm_cfg.get("temperature"))
+    # --- Voice Activity Detection (VAD) ---
     vad = silero.VAD.load()
 
-    # For MallSupportAgent, you can dynamically switch voices (English/Arabic)
-    # based on detection or user input inside the agent
-    # We'll default to English voice at startup
-    english_voice = cfg["voices"]["english"]
-    tts = elevenlabs.TTS(voice_id=english_voice, model=tts_cfg.get("model"))
+    # --- TTS setup (English only) ---
+    tts_cfg = agent_cfg["tts"]
+    english_voice = tts_cfg.get("voices", {}).get("english") or cfg.get(
+        "voices", {}
+    ).get("english")
 
+    if not english_voice:
+        raise RuntimeError("❌ No English voice configured for MallSupportAgent")
+
+    # tts = elevenlabs.TTS(
+    #     voice_id=english_voice,
+    #     model=tts_cfg.get("model", "eleven_turbo_v2_5"),
+    # )
+    provider = tts_cfg.get("providers", {}).get("english", "cartesia")
+    if provider == "cartesia":
+        tts = cartesia.TTS(model=tts_cfg.get("model", "sonic-3"), voice=english_voice, language="en")
+    elif provider == "inworld":
+        tts = inworld.TTS(voice=english_voice)
+    else:
+        tts = elevenlabs.TTS(voice_id=english_voice, model=tts_cfg.get("model", "eleven_turbo_v2_5"))
+
+    # --- Connect + start session ---
     await ctx.connect()
     session = AgentSession(
         llm=llm,
@@ -110,7 +139,7 @@ async def create_mallsupport_session(ctx: JobContext):
     )
 
     await session.start(
-        agent=MallSupportAgent(cfg, ctx.room),
+        agent=MallSupportAgent(agent_cfg, ctx.room),
         room=ctx.room,
         room_input_options=room_io.RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC()
