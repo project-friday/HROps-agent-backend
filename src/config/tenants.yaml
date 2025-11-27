@@ -61,7 +61,7 @@ tenants:
         english_voice: "xctasy8XvGp2cVO9HL9k"   
   emaar:
     company_name: "Emaar (Dubai Mall)"
-    greeting: "Hello! This is Sarah speaking from Dubai Mall Customer Support. Before we start, are you comfortable in English, or would you prefer speaking in Arabic or Chinese?"
+    greeting: "Hello! This is Sarah speaking from Dubai Mall Customer Support. Before we start, are you comfortable in English, or would you prefer speaking in Arabic?"
 
     llm:
       model: "gpt-4.1"
