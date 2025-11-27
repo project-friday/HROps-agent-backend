@@ -84,19 +84,19 @@ class MallSupportAgent(Agent):
         else:
             raise RuntimeError("❌ No Arabic Cartesia voice configured")
 
-        # ---- Mandarin (Inworld) ----
-        mandarin_voice = voices.get("mandarin")
-        self.mandarin_tts = None
-        if mandarin_voice:
-            if providers.get("mandarin") == "inworld":
-                from livekit.plugins import inworld
-                self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
+        # # ---- Mandarin (Inworld) ----
+        # mandarin_voice = voices.get("mandarin")
+        # self.mandarin_tts = None
+        # if mandarin_voice:
+        #     if providers.get("mandarin") == "inworld":
+        #         from livekit.plugins import inworld
+        #         self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
 
         # self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
         super().__init__(
             instructions=EVE_MALL_PROMPT,
             stt=soniox.STT(
-                params=soniox.STTOptions(language_hints=["en", "ar", "zh"]),
+                params=soniox.STTOptions(language_hints=["en", "ar"]),
                 vad=silero.VAD.load(min_speech_duration=0.1),
             ),
             tts=self.english_tts,
@@ -285,8 +285,6 @@ class MallSupportAgent(Agent):
 
                         lang_map = {
                             "arabic": ("ar", switch_cfg.get("arabic", {})),
-                            "chinese": ("zh", switch_cfg.get("mandarin", {})),
-                            "mandarin": ("zh", switch_cfg.get("mandarin", {})),
                         }
 
                         for keyword, (lang_code, cfg) in lang_map.items():
@@ -322,9 +320,9 @@ class MallSupportAgent(Agent):
         if lang.startswith("ar"):
             print("🗣️ Using Arabic TTS voice")
             chosen_tts = self.arabic_tts
-        elif lang.startswith("zh"):
-            print("🗣️ Using Mandarin TTS voice")
-            chosen_tts = self.mandarin_tts
+        # elif lang.startswith("zh"):
+        #     print("🗣️ Using Mandarin TTS voice")
+        #     chosen_tts = self.mandarin_tts
         else:
             activity = self._get_activity_or_raise()
             assert activity.tts is not None, "tts_node called but no TTS node is available"

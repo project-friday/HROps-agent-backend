@@ -64,19 +64,10 @@ class SurveyAgent(Agent):
         else:
             raise RuntimeError("❌ No Arabic ElevenLabs voice configured")
 
-
-        # ---- Mandarin (Inworld) ----
-        mandarin_voice = voices.get("mandarin")
-        self.mandarin_tts = None
-        if mandarin_voice and providers.get("mandarin") == "inworld":
-            self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
-        else:
-            raise RuntimeError("❌ No Mandarin Inworld voice configured")
-
         super().__init__(
             instructions=EVE_SURVEY_PROMPT,
             stt=soniox.STT(
-                params=soniox.STTOptions(language_hints=["en", "ar", "zh"]),
+                params=soniox.STTOptions(language_hints=["en", "ar"]),
                 vad=silero.VAD.load(min_speech_duration=0.1),
             ),
             tools=[feedback_call_tool, feedback_sms_tool],
@@ -250,9 +241,6 @@ class SurveyAgent(Agent):
         if lang.startswith("ar"):
             print("🗣️ Using Arabic survey TTS")
             chosen_tts = self.arabic_tts
-        elif lang.startswith("zh"):
-            print("🗣️ Using Mandarin survey TTS")
-            chosen_tts = self.mandarin_tts
         else:
             print("🗣️ Using English survey TTS")
             chosen_tts = self.english_tts
