@@ -7,15 +7,14 @@ from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession, room_io
 from livekit.plugins import (
     azure,
+    cartesia,
     elevenlabs,
+    inworld,
     noise_cancellation,
     openai,
     silero,
     soniox,
-    cartesia,
-    inworld,
 )
-
 from src.agents.router import RouterAgent
 from src.agents.translator import TranslatorAgent
 from src.helpers.arg_parser import parse_cli_args
@@ -124,11 +123,15 @@ async def create_mallsupport_session(ctx: JobContext):
     # )
     provider = tts_cfg.get("providers", {}).get("english", "cartesia")
     if provider == "cartesia":
-        tts = cartesia.TTS(model=tts_cfg.get("model", "sonic-3"), voice=english_voice, language="en")
+        tts = cartesia.TTS(
+            model=tts_cfg.get("model", "sonic-3"), voice=english_voice, language="en"
+        )
     elif provider == "inworld":
         tts = inworld.TTS(voice=english_voice)
     else:
-        tts = elevenlabs.TTS(voice_id=english_voice, model=tts_cfg.get("model", "eleven_turbo_v2_5"))
+        tts = elevenlabs.TTS(
+            voice_id=english_voice, model=tts_cfg.get("model", "eleven_turbo_v2_5")
+        )
 
     # --- Connect + start session ---
     await ctx.connect()
