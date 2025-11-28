@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import AsyncGenerator, AsyncIterable
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
 
@@ -11,16 +12,26 @@ from livekit import rtc
 from livekit.agents import llm, stt, tokenize, tts, utils
 from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
-from livekit.agents.voice.background_audio import BackgroundAudioPlayer, AudioConfig, BuiltinAudioClip
+from livekit.agents.voice.background_audio import (
+    AudioConfig,
+    BackgroundAudioPlayer,
+    BuiltinAudioClip,
+)
+from livekit.agents.voice.io import TimedString  # ← Missing one
 
 # Plugins
-from livekit.plugins import azure, elevenlabs, openai, silero, soniox, cartesia
+from livekit.plugins import azure, cartesia, elevenlabs, openai, silero, soniox
 
 from src.config.loader import get_cfg
 from src.tools.handover import handover_to_survey
 
 # ---- Import only the knowledge base tool ----
-from src.tools.mallsupport_tools import create_ticket, query_knowledge_base, feedback_sms_tool
+from src.tools.mallsupport_tools import (
+    create_ticket,
+    feedback_sms_tool,
+    query_knowledge_base,
+)
+from src.utils.transcription_utils import is_wrong_script, repair_text
 
 logger = logging.getLogger("dubai-mall-support-agent")
 logger.setLevel(logging.INFO)
@@ -79,7 +90,7 @@ class MallSupportAgent(Agent):
                 model=tts_cfg.get("model", "sonic-3"),
                 voice=arabic_voice,
                 language="ar",
-                volume=2, 
+                volume=2,
             )
         else:
             raise RuntimeError("❌ No Arabic Cartesia voice configured")
@@ -104,7 +115,12 @@ class MallSupportAgent(Agent):
             #     voice_id="H8bdWZHK2OgZwTN7ponr",
             #     model="eleven_turbo_v2_5",
             # ),
-            tools=[query_knowledge_base, create_ticket, handover_to_survey, feedback_sms_tool],
+            tools=[
+                query_knowledge_base,
+                create_ticket,
+                handover_to_survey,
+                feedback_sms_tool,
+            ],
             chat_ctx=chat_ctx,
         )
 
@@ -120,7 +136,7 @@ class MallSupportAgent(Agent):
         self.tool_result_filters = {
             query_knowledge_base: ["internal_id", "metadata"],
             create_ticket: ["ticket_id"],
-            feedback_sms_tool: [],
+            feedback_sms_tool: ["phone_number"],
         }
 
         self.tool_cards = {
@@ -273,15 +289,34 @@ class MallSupportAgent(Agent):
             try:
                 async for event in stream:
                     if (
-                        event.type == SpeechEventType.FINAL_TRANSCRIPT
+                        event.type
+                        in [
+                            # SpeechEventType.INTERIM_TRANSCRIPT,
+                            # SpeechEventType.PREFLIGHT_TRANSCRIPT,
+                            SpeechEventType.FINAL_TRANSCRIPT,
+                        ]
                         and event.alternatives
                     ):
-                        # 👂 Capture language from user speech
                         self._user_language = event.alternatives[0].language
+
+                        # -------------------------------
+                        # FIX: Repair wrong-language STT output here
+                        # -------------------------------
+                        last_alt = event.alternatives[0]
+                        raw_text = last_alt.text.strip()
+                        target_lang = self.manual_language or self._user_language
+
+                        if is_wrong_script(raw_text):
+                            print(f"⚠️ Repairing last alt in {event.type}: {raw_text}")
+                            repaired = await repair_text(self, raw_text, target_lang)
+                            last_alt.text = repaired
+                        # 👂 Capture language from user speech
                         text = event.alternatives[0].text.lower().strip()
                         print("🌐 Detected language:", self._user_language)
                         cfg = get_cfg()
-                        switch_cfg = cfg["agents"]["MallSupportAgent"]["language_switch"]
+                        switch_cfg = cfg["agents"]["MallSupportAgent"][
+                            "language_switch"
+                        ]
 
                         lang_map = {
                             "arabic": ("ar", switch_cfg.get("arabic", {})),
@@ -293,9 +328,13 @@ class MallSupportAgent(Agent):
                                 await asyncio.sleep(0.8)
                                 self.manual_language = self._user_language = lang_code
                                 self.background_audio = BackgroundAudioPlayer(
-                                    ambient_sound=AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8),
+                                    ambient_sound=AudioConfig(
+                                        BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8
+                                    ),
                                 )
-                                await self.background_audio.start(room=self.room, agent_session=self.session)
+                                await self.background_audio.start(
+                                    room=self.room, agent_session=self.session
+                                )
                                 await asyncio.sleep(2.0)
                                 await self.background_audio.aclose()
                                 await self.session.say(cfg.get("greeting", ""))
@@ -325,7 +364,9 @@ class MallSupportAgent(Agent):
         #     chosen_tts = self.mandarin_tts
         else:
             activity = self._get_activity_or_raise()
-            assert activity.tts is not None, "tts_node called but no TTS node is available"
+            assert (
+                activity.tts is not None
+            ), "tts_node called but no TTS node is available"
             chosen_tts = activity.tts
 
         wrapped_tts = chosen_tts
