@@ -15,32 +15,36 @@ def is_wrong_script(text: str) -> bool:
 
 async def repair_text(agent, wrong_text: str, target_lang: str) -> str:
     """
-    Uses the agent's internal LLM and ChatContext to correctly convert
-    wrong-script transcription into proper English or Arabic text.
+    Repairs wrong-script text if it phonetically resembles English or Arabic.
+    Otherwise returns the original text.
     """
 
     chat_ctx = llm.ChatContext.empty()
 
-    # System message
     chat_ctx.add_message(
         role="system",
         content=[
             (
-                "You are a transcription repair model. The input text contains incorrect "
-                "characters from the wrong language script. Convert the text into meaningful "
-                f"{'Arabic' if target_lang.startswith('ar') else 'English'}."
-                "only give the corrected text as output, no extra content or characters."
+                "You are a transcription repair model. Your task is to detect whether the input text "
+                "is a FAILED transcription of English or Arabic that has been incorrectly rendered in "
+                "another non-Latin or non-Arabic script (e.g., Telugu, Hindi, Malayalam, Thai, etc.). "
+                "If the text phonetically resembles English or Arabic words but is written in another "
+                "script, convert it to proper English or Arabic based on the intended language. "
+                "If the input text is a legitimate word or sentence in ANY other natural language "
+                "(Chinese, Japanese, Korean, Hindi, Malayalam, etc.), or if the text does NOT correspond "
+                "to English/Arabic speech, DO NOT modify it. "
+                "In that case, output the exact string: __NO_REPAIR__. "
+                "When repairing, output ONLY the corrected text with no explanations, extra characters, "
+                "or additional sentences."
             )
         ],
     )
 
-    # User message containing the corrupted STT text
     chat_ctx.add_message(
         role="user",
-        content=[f"Fix this text: {wrong_text}"],
+        content=[f"Fix this text for {target_lang}: {wrong_text}"],
     )
 
-    # Call the LLM
     activity = agent._get_activity_or_raise()
     llm_client = activity.llm
 
@@ -52,7 +56,12 @@ async def repair_text(agent, wrong_text: str, target_lang: str) -> str:
             elif chunk.delta and chunk.delta.content:
                 chunks.append(chunk.delta.content)
 
-    # Cleanup: remove messages from memory
     chat_ctx.items.clear()
 
-    return "".join(chunks).strip()
+    result = "".join(chunks).strip()
+
+    # If LLM says "no repair needed", return original
+    if result == "__NO_REPAIR__":
+        return wrong_text
+
+    return result
