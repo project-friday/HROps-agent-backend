@@ -13,10 +13,11 @@ from livekit.agents.stt import SpeechEventType
 from livekit.agents.voice import Agent, ModelSettings
 
 # Plugins
-from livekit.plugins import elevenlabs, silero, soniox, cartesia, inworld
+from livekit.plugins import cartesia, elevenlabs, inworld, silero, soniox
 
 from src.config.loader import get_cfg
 from src.tools.survey_tools import feedback_call_tool, feedback_sms_tool
+from src.utils.transcription_utils import is_wrong_script, repair_text
 
 logger = logging.getLogger("dubai-mall-survey-agent")
 logger.setLevel(logging.INFO)
@@ -193,7 +194,6 @@ class SurveyAgent(Agent):
                     action_name, {"error": str(e)}, tool_func=tool_function
                 )
 
-
     async def stt_node(
         self,
         audio: AsyncGenerator[rtc.AudioFrame, None],
@@ -224,6 +224,14 @@ class SurveyAgent(Agent):
                         event.type == SpeechEventType.FINAL_TRANSCRIPT
                         and event.alternatives
                     ):
+                        last_alt = event.alternatives[0]
+                        raw_text = last_alt.text.strip()
+                        target_lang = self.manual_language or self._user_language
+
+                        if is_wrong_script(raw_text):
+                            print(f"⚠️ Repairing last alt in {event.type}: {raw_text}")
+                            repaired = await repair_text(self, raw_text, target_lang)
+                            last_alt.text = repaired
                         self._user_language = event.alternatives[0].language
                         print("🌐 Detected survey language:", self._user_language)
                     yield event
@@ -236,7 +244,9 @@ class SurveyAgent(Agent):
         model_settings: ModelSettings,
     ) -> AsyncGenerator[rtc.AudioFrame, None]:
         """Switch TTS voice dynamically based on detected language."""
-        lang = getattr(self.session, "state", {}).get("language") or getattr(self, "_user_language", "en")
+        lang = getattr(self.session, "state", {}).get("language") or getattr(
+            self, "_user_language", "en"
+        )
 
         if lang.startswith("ar"):
             print("🗣️ Using Arabic survey TTS")
