@@ -17,21 +17,21 @@ from livekit.agents.voice.background_audio import (
     BackgroundAudioPlayer,
     BuiltinAudioClip,
 )
-from livekit.agents.voice.io import TimedString  # ← Missing one
+from livekit.agents.voice.io import TimedString
 
 # Plugins
 from livekit.plugins import azure, cartesia, elevenlabs, openai, silero, soniox
 
 from src.config.loader import get_cfg
 from src.tools.handover import handover_to_survey
-
-# ---- Import only the knowledge base tool ----
 from src.tools.mallsupport_tools import (
     create_ticket,
     feedback_sms_tool,
     query_knowledge_base,
 )
+from src.utils.stt_factory import create_stt
 from src.utils.transcription_utils import is_wrong_script, repair_text
+
 
 logger = logging.getLogger("dubai-mall-support-agent")
 logger.setLevel(logging.INFO)
@@ -56,6 +56,7 @@ class MallSupportAgent(Agent):
     def __init__(self, cfg: dict, room: rtc.Room, chat_ctx=None) -> None:
         self.room = room
         self.cfg = get_cfg()
+        
         # ---------- TTS setup (multi-language) ----------
         tts_cfg = cfg.get("tts", {})
         voices = tts_cfg.get("voices", {})
@@ -72,17 +73,6 @@ class MallSupportAgent(Agent):
         else:
             raise RuntimeError("❌ No English ElevenLabs voice configured")
 
-        # # ---- English (Cartesia) ----
-        # english_voice = voices.get("english")
-        # self.english_tts = None
-        # if english_voice and providers.get("english", "cartesia") == "cartesia":
-        #     self.english_tts = cartesia.TTS(
-        #         model=tts_cfg.get("model", "sonic-3"),
-        #         voice=english_voice,
-        #         language="en",
-        #         speed=0.8,
-        #     )
-
         # ---- Arabic (Cartesia) ----
         arabic_voice = voices.get("arabic")
         if arabic_voice and providers.get("arabic", "cartesia") == "cartesia":
@@ -95,26 +85,21 @@ class MallSupportAgent(Agent):
         else:
             raise RuntimeError("❌ No Arabic Cartesia voice configured")
 
-        # # ---- Mandarin (Inworld) ----
-        # mandarin_voice = voices.get("mandarin")
-        # self.mandarin_tts = None
-        # if mandarin_voice:
-        #     if providers.get("mandarin") == "inworld":
-        #         from livekit.plugins import inworld
-        #         self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
+        # ---------- STT setup (configurable) ----------
+        stt_cfg = cfg.get("stt", {})
+        
+        try:
+            stt_instance = create_stt(stt_cfg)
+            provider_name = stt_cfg.get("provider", "soniox")
+            logger.info(f"✅ STT initialized with provider: {provider_name}")
+        except Exception as e:
+            logger.error(f"Failed to initialize STT: {e}")
+            raise RuntimeError(f"STT initialization failed: {e}") from e
 
-        # self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
         super().__init__(
             instructions=EVE_MALL_PROMPT,
-            stt=soniox.STT(
-                params=soniox.STTOptions(language_hints=["en", "ar"]),
-                vad=silero.VAD.load(min_speech_duration=0.1),
-            ),
+            stt=stt_instance,
             tts=self.english_tts,
-            # tts=elevenlabs.TTS(
-            #     voice_id="H8bdWZHK2OgZwTN7ponr",
-            #     model="eleven_turbo_v2_5",
-            # ),
             tools=[
                 query_knowledge_base,
                 create_ticket,
@@ -132,7 +117,6 @@ class MallSupportAgent(Agent):
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
-        # Optional: keys to filter from tool results before sending
         self.tool_result_filters = {
             query_knowledge_base: ["internal_id", "metadata"],
             create_ticket: ["ticket_id"],
@@ -147,7 +131,7 @@ class MallSupportAgent(Agent):
         }
 
         self.visible_tools = {create_ticket, feedback_sms_tool}
-        self.manual_language = None  # tracks manually switched language
+        self.manual_language = None
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -233,10 +217,8 @@ class MallSupportAgent(Agent):
 
                 yield chunk
 
-        # Capture final LLM response
         self.last_llm_response = "".join(buffer).strip()
 
-        # Execute queued tools and send results
         for action_name, tool_function, tool_args in pending_tools:
             if tool_function not in self.visible_tools:
                 logger.info("Skipping execution of %s (not visible)", action_name)
@@ -265,7 +247,8 @@ class MallSupportAgent(Agent):
         model_settings: ModelSettings,
     ) -> AsyncGenerator[stt.SpeechEvent, None]:
         """Track detected language (en/ar)."""
-        print("🎤 Starting STT node for mall support...")
+        logger.info("🎤 Starting STT node for mall support")
+        
         activity = self._get_activity_or_raise()
         assert activity.stt is not None, "stt_node called but no STT node available"
 
@@ -291,28 +274,26 @@ class MallSupportAgent(Agent):
                     if (
                         event.type
                         in [
-                            # SpeechEventType.INTERIM_TRANSCRIPT,
-                            # SpeechEventType.PREFLIGHT_TRANSCRIPT,
                             SpeechEventType.FINAL_TRANSCRIPT,
                         ]
                         and event.alternatives
                     ):
                         self._user_language = event.alternatives[0].language
 
-                        # -------------------------------
-                        # FIX: Repair wrong-language STT output here
-                        # -------------------------------
                         last_alt = event.alternatives[0]
                         raw_text = last_alt.text.strip()
                         target_lang = self.manual_language or self._user_language
 
                         if is_wrong_script(raw_text):
-                            print(f"⚠️ Repairing last alt in {event.type}: {raw_text}")
+                            logger.warning(
+                                f"⚠️ Repairing wrong-script text in {event.type}: {raw_text}"
+                            )
                             repaired = await repair_text(self, raw_text, target_lang)
                             last_alt.text = repaired
-                        # 👂 Capture language from user speech
+                        
                         text = event.alternatives[0].text.lower().strip()
-                        print("🌐 Detected language:", self._user_language)
+                        logger.info(f"🌐 Detected language: {self._user_language}")
+                        
                         cfg = get_cfg()
                         switch_cfg = cfg["agents"]["MallSupportAgent"][
                             "language_switch"
@@ -339,6 +320,7 @@ class MallSupportAgent(Agent):
                                 await self.background_audio.aclose()
                                 await self.session.say(cfg.get("greeting", ""))
                                 break
+                    
                     yield event
             finally:
                 await utils.aio.cancel_and_wait(forward_task)
@@ -348,20 +330,15 @@ class MallSupportAgent(Agent):
         text: AsyncGenerator[str, None],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[rtc.AudioFrame, None]:
-        """
-        Dynamically choose  TTS voice based on detected STT language.
-
-        """
+        """Dynamically choose TTS voice based on detected STT language."""
         lang = self.manual_language or getattr(self, "_user_language", "en")
+        
         if self.manual_language == "en":
             self._user_language = "en"
 
         if lang.startswith("ar"):
-            print("🗣️ Using Arabic TTS voice")
+            logger.info("🗣️ Using Arabic TTS voice")
             chosen_tts = self.arabic_tts
-        # elif lang.startswith("zh"):
-        #     print("🗣️ Using Mandarin TTS voice")
-        #     chosen_tts = self.mandarin_tts
         else:
             activity = self._get_activity_or_raise()
             assert (
@@ -394,7 +371,7 @@ class MallSupportAgent(Agent):
                 await asyncio.wait([forward_task])
 
     async def on_enter(self):
+        """Speaks immediately after the agent becomes active."""
         cfg = get_cfg()
         self.manual_language = "en"
-        """Speaks immediately after the agent becomes active."""
         await self.session.say(cfg["greeting"])

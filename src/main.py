@@ -14,6 +14,7 @@ from livekit.plugins import (
     openai,
     silero,
     soniox,
+    speechmatics,
 )
 from src.agents.router import RouterAgent
 from src.agents.translator import TranslatorAgent
