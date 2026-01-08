@@ -1,7 +1,7 @@
 tenants:
   hsbc:
     company_name: "HSBC"
-    greeting: "Hey there, I’m Eve, speaking from HSBC Talent Acquisition Team. How may I help you?"
+    greeting: "Hey there, I'm Eve, speaking from HSBC Talent Acquisition Team. How may I help you?"
     llm:
       model: "gpt-4.1"
       temperature: 0.1
@@ -20,7 +20,7 @@ tenants:
         accent:
           indian: "H8bdWZHK2OgZwTN7ponr"
           us: "xctasy8XvGp2cVO9HL9k"
-
+ 
   walmart:
     company_name: "Walmart"
     greeting: "Thank you for calling Walmart People Services, My name is Eve. How may I help you?"
@@ -52,13 +52,13 @@ tenants:
         target_voice: "H8bdWZHK2OgZwTN7ponr"
         placeholder: "Hindi"
         language_code: hi
-        english_voice: "xctasy8XvGp2cVO9HL9k"            # for Deepgram/ElevenLabs
+        english_voice: "xctasy8XvGp2cVO9HL9k"
 
       spanish:
         target_voice: "tomkxGQGz4b1kE0EM722"
         placeholder: "Spanish"
         language_code: es 
-        english_voice: "xctasy8XvGp2cVO9HL9k"   
+        english_voice: "xctasy8XvGp2cVO9HL9k"
   emaar:
     company_name: "Emaar (Dubai Mall)"
     greeting: "Hello! This is Sarah speaking from Dubai Mall Customer Support. Before we start, are you comfortable in English, or would you prefer speaking in Arabic?"
@@ -74,7 +74,7 @@ tenants:
     agents:
       MallSupportAgent:
         stt:
-          provider: "deepgram"
+          provider: "speechmatics"
           language_code: "en"
           endpointing_ms: 100
         tts:
@@ -107,4 +107,3 @@ tenants:
           en: "Hello there! Hope Sarah helped you well! Could you please rate your experience of having conversation with her from one to five, where one is the lowest and five is the best?"
           ar: "مرحباً! نأمل أن سارة قدّمت لك المساعدة بشكل جيد. هل يمكنك تقييم تجربتك في التحدث معها من واحد إلى خمسة، حيث واحد هو الأدنى وخمسة هو الأفضل؟"
           # for Deepgram/ElevenLabs
-

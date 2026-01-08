@@ -95,6 +95,9 @@ class SurveyAgent(Agent):
             feedback_sms_tool: "feedback_sms_result",
         }
 
+        self.manual_language = None  # tracks manually switched language
+        self._user_language = "en"   # default to English
+
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
     ):
