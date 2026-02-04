@@ -227,15 +227,41 @@ class SurveyAgent(Agent):
                         event.type == SpeechEventType.FINAL_TRANSCRIPT
                         and event.alternatives
                     ):
+                        detected_lang = event.alternatives[0].language
                         last_alt = event.alternatives[0]
                         raw_text = last_alt.text.strip()
-                        target_lang = self.manual_language or self._user_language
+
+                        # Preserve manually / session-set language;
+                        # only update from STT when no override exists.
+                        session_lang = (
+                            getattr(self.session, "state", {}).get("language")
+                            or getattr(self, "manual_language", None)
+                        )
+                        if not session_lang:
+                            self._user_language = detected_lang
+                        else:
+                            self._user_language = session_lang
+
+                        target_lang = session_lang or self._user_language
 
                         if is_wrong_script(raw_text):
                             print(f"⚠️ Repairing last alt in {event.type}: {raw_text}")
                             repaired = await repair_text(self, raw_text, target_lang)
                             last_alt.text = repaired
-                        self._user_language = event.alternatives[0].language
+                        elif (
+                            session_lang
+                            and detected_lang != session_lang
+                            and raw_text
+                        ):
+                            print(
+                                f"⚠️ Language mismatch: session={session_lang}, "
+                                f"detected={detected_lang}. Repairing: {raw_text}"
+                            )
+                            repaired = await repair_text(
+                                self, raw_text, session_lang
+                            )
+                            last_alt.text = repaired
+
                         print("🌐 Detected survey language:", self._user_language)
                     yield event
             finally:

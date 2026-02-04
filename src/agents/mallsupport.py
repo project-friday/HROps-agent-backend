@@ -297,7 +297,17 @@ class MallSupportAgent(Agent):
                         ]
                         and event.alternatives
                     ):
-                        self._user_language = event.alternatives[0].language
+                        detected_lang = event.alternatives[0].language
+
+                        # Only update _user_language from STT if no
+                        # manual language override is active.  When the
+                        # user has explicitly chosen a language (e.g.
+                        # Arabic), stray English numbers / code-switch
+                        # fragments must NOT flip the session language.
+                        if not self.manual_language:
+                            self._user_language = detected_lang
+                        else:
+                            self._user_language = self.manual_language
 
                         # -------------------------------
                         # FIX: Repair wrong-language STT output here
@@ -310,6 +320,25 @@ class MallSupportAgent(Agent):
                             print(f"⚠️ Repairing last alt in {event.type}: {raw_text}")
                             repaired = await repair_text(self, raw_text, target_lang)
                             last_alt.text = repaired
+                        # When manual language is set and STT detected a
+                        # different language, the transcription text may
+                        # be garbled (e.g. Arabic speech rendered as
+                        # English phonemes).  Repair it so the LLM
+                        # receives correct text.
+                        elif (
+                            self.manual_language
+                            and detected_lang != self.manual_language
+                            and raw_text
+                        ):
+                            print(
+                                f"⚠️ Language mismatch: manual={self.manual_language}, "
+                                f"detected={detected_lang}. Repairing: {raw_text}"
+                            )
+                            repaired = await repair_text(
+                                self, raw_text, self.manual_language
+                            )
+                            last_alt.text = repaired
+
                         # 👂 Capture language from user speech
                         text = event.alternatives[0].text.lower().strip()
                         print("🌐 Detected language:", self._user_language)
