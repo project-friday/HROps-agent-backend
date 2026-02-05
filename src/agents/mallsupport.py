@@ -31,6 +31,7 @@ from src.tools.mallsupport_tools import (
     feedback_sms_tool,
     query_knowledge_base,
 )
+from src.utils.audio_recorder import UserAudioRecorder
 from src.utils.transcription_utils import is_wrong_script, repair_text
 
 logger = logging.getLogger("dubai-mall-support-agent")
@@ -148,6 +149,8 @@ class MallSupportAgent(Agent):
 
         self.visible_tools = {create_ticket, feedback_sms_tool}
         self.manual_language = None  # tracks manually switched language
+
+        self.audio_recorder = UserAudioRecorder(output_dir="recordings/user_audio")
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -283,6 +286,7 @@ class MallSupportAgent(Agent):
             @utils.log_exceptions()
             async def _forward_input() -> None:
                 async for frame in audio:
+                    self.audio_recorder.add_frame(frame)
                     stream.push_frame(frame)
 
             forward_task = asyncio.create_task(_forward_input())
@@ -423,7 +427,12 @@ class MallSupportAgent(Agent):
                 await asyncio.wait([forward_task])
 
     async def on_enter(self):
+        """Speaks immediately after the agent becomes active."""
         cfg = get_cfg()
         self.manual_language = "en"
-        """Speaks immediately after the agent becomes active."""
+        self.audio_recorder.start_session(session_id=self.room.name)
         await self.session.say(cfg["greeting"])
+
+    async def on_exit(self):
+        """Save recorded audio when session ends."""
+        self.audio_recorder.save()
