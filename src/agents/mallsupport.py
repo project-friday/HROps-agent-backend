@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from collections.abc import AsyncGenerator, AsyncIterable
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
@@ -150,7 +151,9 @@ class MallSupportAgent(Agent):
         self.visible_tools = {create_ticket, feedback_sms_tool}
         self.manual_language = None  # tracks manually switched language
 
-        self.audio_recorder = UserAudioRecorder(output_dir="recordings/user_audio")
+        # Audio recording (enabled via --record-audio flag)
+        self._record_audio = os.environ.get("RECORD_AUDIO", "false") == "true"
+        self.audio_recorder = UserAudioRecorder(output_dir="recordings/user_audio") if self._record_audio else None
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -286,7 +289,8 @@ class MallSupportAgent(Agent):
             @utils.log_exceptions()
             async def _forward_input() -> None:
                 async for frame in audio:
-                    self.audio_recorder.add_frame(frame)
+                    if self.audio_recorder:
+                        self.audio_recorder.add_frame(frame)
                     stream.push_frame(frame)
 
             forward_task = asyncio.create_task(_forward_input())
@@ -430,9 +434,11 @@ class MallSupportAgent(Agent):
         """Speaks immediately after the agent becomes active."""
         cfg = get_cfg()
         self.manual_language = "en"
-        self.audio_recorder.start_session(session_id=self.room.name)
+        if self.audio_recorder:
+            self.audio_recorder.start_session(session_id=self.room.name)
         await self.session.say(cfg["greeting"])
 
     async def on_exit(self):
         """Save recorded audio when session ends."""
-        self.audio_recorder.save()
+        if self.audio_recorder:
+            self.audio_recorder.save()

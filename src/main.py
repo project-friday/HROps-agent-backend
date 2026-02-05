@@ -164,15 +164,16 @@ async def entrypoint(ctx: JobContext):
 
 if __name__ == "__main__":
     # --- Parse CLI arguments ---
-    tenant, flow, language, accent, sys.argv = parse_cli_args(sys.argv)
+    tenant, flow, language, accent, record_audio, sys.argv = parse_cli_args(sys.argv)
 
     # --- Load overrides into environment ---
     os.environ["TENANT_CLI_OVERRIDE"] = tenant
     os.environ["FLOW_CLI_OVERRIDE"] = flow
     os.environ["LANGUAGE_OVERRIDE"] = language
     os.environ["ACCENT_OVERRIDE"] = accent
+    os.environ["RECORD_AUDIO"] = "true" if record_audio else "false"
 
-    print(f"Tenant={tenant}, Flow={flow}, Language={language}, Accent={accent}")
+    print(f"Tenant={tenant}, Flow={flow}, Language={language}, Accent={accent}, RecordAudio={record_audio}")
 
     # --- Launch worker ---
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
