@@ -14,14 +14,24 @@ def extract_arg(argv: List[str], flag: str, default: str) -> Tuple[str, List[str
     return default, argv
 
 
-def parse_cli_args(argv: List[str]) -> Tuple[str, str, str, str, List[str]]:
+def extract_bool_flag(argv: List[str], flag: str) -> Tuple[bool, List[str]]:
+    """Extract a boolean CLI flag, returning (True if present, cleaned_argv)."""
+    if flag in argv:
+        idx = argv.index(flag)
+        argv = argv[:idx] + argv[idx + 1 :]
+        return True, argv
+    return False, argv
+
+
+def parse_cli_args(argv: List[str]) -> Tuple[str, str, str, str, bool, List[str]]:
     """
-    Extract --tenant, --flow, --language, and --accent from argv,
+    Extract --tenant, --flow, --language, --accent, and --record-audio from argv,
     stripping them to avoid CLI conflicts.
     """
     tenant, argv = extract_arg(argv, "--tenant", "walmart")
     flow, argv = extract_arg(argv, "--flow", "default")
     language, argv = extract_arg(argv, "--language", "english")
     accent, argv = extract_arg(argv, "--accent", "indian")
+    record_audio, argv = extract_bool_flag(argv, "--record-audio")
 
-    return tenant, flow, language, accent, argv
+    return tenant, flow, language, accent, record_audio, argv
