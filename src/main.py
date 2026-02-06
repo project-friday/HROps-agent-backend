@@ -150,6 +150,67 @@ async def create_mallsupport_session(ctx: JobContext):
     )
 
 
+# --- Finance Collection Session (Simplified - JSON data, random customer) ---
+async def create_finance_session(ctx: JobContext):
+    """Start a Finance Collection session with random customer from JSON."""
+    from src.agents.finance_collection import FinanceCollectionAgent
+    from src.config.loader import get_cfg
+
+    # --- Load tenant + agent config ---
+    cfg = get_cfg()
+    agent_cfg = cfg["agents"]["FinanceCollectionAgent"]
+
+    # --- LLM setup ---
+    llm_cfg = agent_cfg.get("llm", cfg.get("llm", {}))
+    llm = openai.LLM(
+        model=llm_cfg.get("model", "gpt-4.1"),
+        temperature=llm_cfg.get("temperature", 0.1),
+    )
+
+    # --- Voice Activity Detection (VAD) ---
+    vad = silero.VAD.load()
+
+    # --- TTS setup (English default) ---
+    tts_cfg = agent_cfg.get("tts", {})
+    english_voice = tts_cfg.get("voices", {}).get("english", "H8bdWZHK2OgZwTN7ponr")
+    provider = tts_cfg.get("providers", {}).get("english", "elevenlabs")
+
+    if provider == "cartesia":
+        tts = cartesia.TTS(
+            model=tts_cfg.get("model", "sonic-3"),
+            voice=english_voice,
+            language="en"
+        )
+    else:
+        tts = elevenlabs.TTS(
+            voice_id=english_voice,
+            model=tts_cfg.get("model", "eleven_turbo_v2_5")
+        )
+
+    # --- Connect to room ---
+    await ctx.connect()
+
+    # --- Start agent session with random customer ---
+    session = AgentSession(
+        llm=llm,
+        vad=vad,
+        tts=tts,
+    )
+
+    # Agent will randomly pick a customer from JSON
+    await session.start(
+        agent=FinanceCollectionAgent(
+            cfg=agent_cfg,
+            room=ctx.room,
+            random_customer=True,
+        ),
+        room=ctx.room,
+        room_input_options=room_io.RoomInputOptions(
+            noise_cancellation=noise_cancellation.BVC()
+        ),
+    )
+
+
 # --- Main entrypoint ---
 async def entrypoint(ctx: JobContext):
     tenant_env = os.getenv("TENANT_CLI_OVERRIDE", "walmart")
@@ -158,6 +219,8 @@ async def entrypoint(ctx: JobContext):
         await create_translator_session(ctx)
     elif tenant_env == "emaar":
         await create_mallsupport_session(ctx)
+    elif tenant_env == "emaar_finance":
+        await create_finance_session(ctx)
     else:
         await create_hr_session(ctx)
 

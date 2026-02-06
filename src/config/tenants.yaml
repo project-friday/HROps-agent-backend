@@ -107,3 +107,56 @@ tenants:
           en: "Hello there! Hope Sarah helped you well! Could you please rate your experience of having conversation with her from one to five, where one is the lowest and five is the best?"
           ar: "مرحباً! نأمل أن سارة قدّمت لك المساعدة بشكل جيد. هل يمكنك تقييم تجربتك في التحدث معها من واحد إلى خمسة، حيث واحد هو الأدنى وخمسة هو الأفضل؟"
           # for Deepgram/ElevenLabs
+
+  emaar_finance:
+    company_name: "Emaar Properties Finance"
+    greeting: "Hello, am I speaking with {customer_name}?"
+
+    llm:
+      model: "gpt-4.1"
+      temperature: 0.1
+
+    flows:
+      default:
+        enabled_agents: ["FinanceCollectionAgent"]
+
+    # Outbound calling configuration
+    outbound:
+      sip_trunk_id: "${SIP_OUTBOUND_TRUNK_ID}"
+      caller_id: "+971xxxxxxxxx"
+      max_concurrent_calls: 5
+      delay_between_calls: 30
+
+    # Scheduling configuration
+    scheduler:
+      enabled: true
+      timezone: "Asia/Dubai"
+      calling_windows:
+        morning:
+          start: "09:00"
+          end: "12:00"
+        afternoon:
+          start: "12:00"
+          end: "15:00"
+        evening:
+          start: "15:00"
+          end: "18:00"
+      max_retry_attempts: 3
+
+    agents:
+      FinanceCollectionAgent:
+        stt:
+          provider: "soniox"
+          language_hints: ["en", "ar"]
+          endpointing_ms: 150
+        tts:
+          model: "sonic-3"
+          providers:
+            arabic: "cartesia"
+            english: "elevenlabs"
+          voices:
+            arabic: "6304c635-6681-4f9e-85b6-a97f4d26461a"  # Amira
+            english: "H8bdWZHK2OgZwTN7ponr"  # Professional voice
+        llm:
+          model: "gpt-4.1"
+          temperature: 0.1

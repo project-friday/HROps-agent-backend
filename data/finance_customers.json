@@ -1,0 +1,70 @@
+{
+  "customers": [
+    {
+      "id": 1,
+      "name": "Sachin Vijaykumar",
+      "phone": "+971501234567",
+      "property_name": "Gulf Hills",
+      "unit_number": "102",
+      "amount_due": 153889.00,
+      "due_date": "2026-01-15",
+      "grace_period_end": "2026-02-13",
+      "installment_type": "2nd installment",
+      "status": "pending",
+      "preferred_language": "en"
+    },
+    {
+      "id": 2,
+      "name": "Ravi Sharma",
+      "phone": "+971502345678",
+      "property_name": "B1",
+      "unit_number": "1001",
+      "amount_due": 75000.00,
+      "due_date": "2026-01-28",
+      "grace_period_end": "2026-02-27",
+      "installment_type": "40% construction",
+      "status": "pending",
+      "preferred_language": "ar"
+    },
+    {
+      "id": 3,
+      "name": "Vivek Oberoi",
+      "phone": "+971503456789",
+      "property_name": "Parkside Views 1",
+      "unit_number": "417",
+      "amount_due": 358518.00,
+      "due_date": "2025-12-29",
+      "grace_period_end": "2026-02-28",
+      "installment_type": "80% construction",
+      "status": "pending",
+      "preferred_language": "en"
+    },
+    {
+      "id": 4,
+      "name": "Ahmed Al-Rashid",
+      "phone": "+971504567890",
+      "property_name": "Downtown Views",
+      "unit_number": "1405",
+      "amount_due": 245000.00,
+      "due_date": "2026-02-01",
+      "grace_period_end": "2026-03-02",
+      "installment_type": "3rd installment",
+      "status": "pending",
+      "preferred_language": "ar"
+    },
+    {
+      "id": 5,
+      "name": "Priya Nair",
+      "phone": "+971505678901",
+      "property_name": "Dubai Creek Harbour",
+      "unit_number": "A205",
+      "amount_due": 420000.00,
+      "due_date": "2026-01-20",
+      "grace_period_end": "2026-02-19",
+      "installment_type": "Final payment",
+      "status": "pending",
+      "preferred_language": "en"
+    }
+  ],
+  "default_customer_id": 1
+}
