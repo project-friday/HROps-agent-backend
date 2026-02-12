@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 
 # from src.agents.onboarding import OnboardingAgent
 from livekit.agents import function_tool  # decorator used by the agent to call tools
-from livekit.agents import RunContext
 
 from src.utils.emails import send_email  # SES email sender
 
@@ -129,6 +128,26 @@ async def create_ticket(phone_number: int, issue_description: str) -> dict:
     }
 
     return ticket
+
+@function_tool(
+    description=(
+        "Switch the conversation language. Call this ONLY when the user explicitly "
+        "asks to change language (e.g. 'speak Arabic', 'switch to English', 'تكلم عربي'). "
+        "Do NOT call this when the user merely mentions a language in a question."
+    )
+)
+async def switch_language(language: str) -> dict:
+    """
+    Signal a language switch. The actual TTS voice switch, notice, and
+    greeting are handled by the tts_node when it sees the pending switch.
+    language: 'ar' for Arabic, 'en' for English.
+    """
+    lang = language.lower().strip()
+    if lang not in ("ar", "en"):
+        return {"status": "error", "message": f"Unsupported language: {language}. Only 'en' and 'ar' are supported."}
+
+    return {"status": "ok", "language": lang}
+
 
 @function_tool(description="Send feedback SMS link when customer declines to rate on the call.")
 async def feedback_sms_tool(phone_number: str) -> dict:

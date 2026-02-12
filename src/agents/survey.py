@@ -17,7 +17,6 @@ from livekit.plugins import cartesia, elevenlabs, inworld, silero, soniox
 
 from src.config.loader import get_cfg
 from src.tools.survey_tools import feedback_call_tool, feedback_sms_tool
-from src.utils.transcription_utils import is_wrong_script, repair_text
 
 logger = logging.getLogger("dubai-mall-survey-agent")
 logger.setLevel(logging.INFO)
@@ -35,7 +34,7 @@ class SurveyAgent(Agent):
     Dubai Mall Survey Agent:
     - Conducts customer satisfaction surveys
     - Handles multilingual (English/Arabic) interactions
-    - Switches TTS dynamically based on detected speech language
+    - Uses session language passed from the previous agent
     """
 
     def __init__(self, cfg: dict, room: rtc.Room, chat_ctx=None) -> None:
@@ -79,7 +78,6 @@ class SurveyAgent(Agent):
         self.actions = {
             "Feedback Rating": feedback_call_tool,
             "Feedback SMS": feedback_sms_tool,
-            # "Submit Survey Response": submit_survey_response,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
@@ -94,9 +92,6 @@ class SurveyAgent(Agent):
             feedback_call_tool: "feedback_call_result",
             feedback_sms_tool: "feedback_sms_result",
         }
-
-        self.manual_language = None  # tracks manually switched language
-        self._user_language = "en"   # default to English
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -149,7 +144,6 @@ class SurveyAgent(Agent):
                     if chunk.delta and chunk.delta.content:
                         buffer.append(chunk.delta.content)
 
-                    # 🟢 Detect when the LLM triggers a tool call
                     if chunk.delta and chunk.delta.tool_calls:
                         for tool_call in chunk.delta.tool_calls:
                             tool_name = tool_call.name
@@ -161,7 +155,6 @@ class SurveyAgent(Agent):
                                 except json.JSONDecodeError:
                                     tool_args = {}
 
-                            # Match the function by name
                             tool_function = None
                             action_name = None
                             for name, func in self.actions.items():
@@ -202,7 +195,7 @@ class SurveyAgent(Agent):
         audio: AsyncGenerator[rtc.AudioFrame, None],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[stt.SpeechEvent, None]:
-        """Detect language (en/ar) for dynamic TTS switching."""
+        """Transcribe user audio. Language is managed by session state only."""
         print("🎤 Starting STT node for survey agent...")
         activity = self._get_activity_or_raise()
         assert activity.stt is not None, "stt_node called but no STT node available"
@@ -227,42 +220,8 @@ class SurveyAgent(Agent):
                         event.type == SpeechEventType.FINAL_TRANSCRIPT
                         and event.alternatives
                     ):
-                        detected_lang = event.alternatives[0].language
-                        last_alt = event.alternatives[0]
-                        raw_text = last_alt.text.strip()
-
-                        # Preserve manually / session-set language;
-                        # only update from STT when no override exists.
-                        session_lang = (
-                            getattr(self.session, "state", {}).get("language")
-                            or getattr(self, "manual_language", None)
-                        )
-                        if not session_lang:
-                            self._user_language = detected_lang
-                        else:
-                            self._user_language = session_lang
-
-                        target_lang = session_lang or self._user_language
-
-                        if is_wrong_script(raw_text):
-                            print(f"⚠️ Repairing last alt in {event.type}: {raw_text}")
-                            repaired = await repair_text(self, raw_text, target_lang)
-                            last_alt.text = repaired
-                        elif (
-                            session_lang
-                            and detected_lang != session_lang
-                            and raw_text
-                        ):
-                            print(
-                                f"⚠️ Language mismatch: session={session_lang}, "
-                                f"detected={detected_lang}. Repairing: {raw_text}"
-                            )
-                            repaired = await repair_text(
-                                self, raw_text, session_lang
-                            )
-                            last_alt.text = repaired
-
-                        print("🌐 Detected survey language:", self._user_language)
+                        session_lang = getattr(self.session, "state", {}).get("language", "en")
+                        print("🌐 Survey session language:", session_lang)
                     yield event
             finally:
                 await utils.aio.cancel_and_wait(forward_task)
@@ -272,10 +231,8 @@ class SurveyAgent(Agent):
         text: AsyncGenerator[str, None],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[rtc.AudioFrame, None]:
-        """Switch TTS voice dynamically based on detected language."""
-        lang = getattr(self.session, "state", {}).get("language") or getattr(
-            self, "_user_language", "en"
-        )
+        """Switch TTS voice based on session language from handover."""
+        lang = getattr(self.session, "state", {}).get("language", "en")
 
         if lang.startswith("ar"):
             print("🗣️ Using Arabic survey TTS")

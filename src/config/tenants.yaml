@@ -89,6 +89,9 @@ tenants:
           arabic:
             notice: "Sure, in that case let me transfer this call to someone who can assist you in Arabic."
             greeting: "مرحبًا! أنا أميرة من دعم عملاء دبي مول. كيف يمكنني مساعدتك اليوم؟"
+          english:
+            notice: "بالتأكيد، دعني أحولك لمن يساعدك بالإنجليزية."
+            greeting: "Hello! I'm here to help. How can I assist you today?"
 
       SurveyAgent:
         stt:

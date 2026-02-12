@@ -74,7 +74,7 @@ async def handover_to_survey(context: RunContext[dict]):
     current_agent = context.session.current_agent
     cfg = current_agent.cfg  # full tenant config already loaded
 
-    user_lang = getattr(current_agent, "_user_language", "en")
+    user_lang = getattr(current_agent, "session_language", "en")
     context.session.state = {**getattr(context.session, "state", {}), "language": user_lang}
 
     # get the SurveyAgent-specific config from the same tenant config

@@ -31,9 +31,9 @@ from src.tools.mallsupport_tools import (
     create_ticket,
     feedback_sms_tool,
     query_knowledge_base,
+    switch_language,
 )
 from src.utils.audio_recorder import UserAudioRecorder
-from src.utils.transcription_utils import is_wrong_script, repair_text
 
 logger = logging.getLogger("dubai-mall-support-agent")
 logger.setLevel(logging.INFO)
@@ -74,17 +74,6 @@ class MallSupportAgent(Agent):
         else:
             raise RuntimeError("❌ No English ElevenLabs voice configured")
 
-        # # ---- English (Cartesia) ----
-        # english_voice = voices.get("english")
-        # self.english_tts = None
-        # if english_voice and providers.get("english", "cartesia") == "cartesia":
-        #     self.english_tts = cartesia.TTS(
-        #         model=tts_cfg.get("model", "sonic-3"),
-        #         voice=english_voice,
-        #         language="en",
-        #         speed=0.8,
-        #     )
-
         # ---- Arabic (Cartesia) ----
         arabic_voice = voices.get("arabic")
         if arabic_voice and providers.get("arabic", "cartesia") == "cartesia":
@@ -97,15 +86,6 @@ class MallSupportAgent(Agent):
         else:
             raise RuntimeError("❌ No Arabic Cartesia voice configured")
 
-        # # ---- Mandarin (Inworld) ----
-        # mandarin_voice = voices.get("mandarin")
-        # self.mandarin_tts = None
-        # if mandarin_voice:
-        #     if providers.get("mandarin") == "inworld":
-        #         from livekit.plugins import inworld
-        #         self.mandarin_tts = inworld.TTS(voice=mandarin_voice)
-
-        # self.azure_tts_en = azure.TTS(voice="en-US-JennyNeural")
         super().__init__(
             instructions=EVE_MALL_PROMPT,
             stt=soniox.STT(
@@ -113,15 +93,12 @@ class MallSupportAgent(Agent):
                 vad=silero.VAD.load(min_speech_duration=0.1),
             ),
             tts=self.english_tts,
-            # tts=elevenlabs.TTS(
-            #     voice_id="H8bdWZHK2OgZwTN7ponr",
-            #     model="eleven_turbo_v2_5",
-            # ),
             tools=[
                 query_knowledge_base,
                 create_ticket,
                 handover_to_survey,
                 feedback_sms_tool,
+                switch_language,
             ],
             chat_ctx=chat_ctx,
         )
@@ -131,6 +108,7 @@ class MallSupportAgent(Agent):
             "Creating ticket": create_ticket,
             "Handover to Survey": handover_to_survey,
             "Send Feedback SMS": feedback_sms_tool,
+            "Switch Language": switch_language,
         }
         self.function_to_action = {v: k for k, v in self.actions.items()}
 
@@ -149,7 +127,8 @@ class MallSupportAgent(Agent):
         }
 
         self.visible_tools = {create_ticket, feedback_sms_tool}
-        self.manual_language = None  # tracks manually switched language
+        self.session_language = "en"  # single source of truth for session language
+        self._pending_lang_switch = None  # set by llm_node when switch_language tool is called
 
         # Audio recording (enabled via --record-audio flag)
         self._record_audio = os.environ.get("RECORD_AUDIO", "false") == "true"
@@ -237,6 +216,13 @@ class MallSupportAgent(Agent):
                                     (action_name, tool_function, tool_args)
                                 )
 
+                                # Capture language switch for tts_node
+                                if tool_name == "switch_language":
+                                    lang = tool_args.get("language", "").lower().strip()
+                                    if lang in ("ar", "en"):
+                                        self._pending_lang_switch = lang
+                                        logger.info("Pending language switch to: %s", lang)
+
                 yield chunk
 
         # Capture final LLM response
@@ -270,7 +256,7 @@ class MallSupportAgent(Agent):
         audio: AsyncGenerator[rtc.AudioFrame, None],
         model_settings: ModelSettings,
     ) -> AsyncGenerator[stt.SpeechEvent, None]:
-        """Track detected language (en/ar)."""
+        """Transcribe user audio. Language is managed by session_language only."""
         print("🎤 Starting STT node for mall support...")
         activity = self._get_activity_or_raise()
         assert activity.stt is not None, "stt_node called but no STT node available"
@@ -297,88 +283,42 @@ class MallSupportAgent(Agent):
             try:
                 async for event in stream:
                     if (
-                        event.type
-                        in [
-                            # SpeechEventType.INTERIM_TRANSCRIPT,
-                            # SpeechEventType.PREFLIGHT_TRANSCRIPT,
-                            SpeechEventType.FINAL_TRANSCRIPT,
-                        ]
+                        event.type == SpeechEventType.FINAL_TRANSCRIPT
                         and event.alternatives
                     ):
-                        detected_lang = event.alternatives[0].language
-
-                        # Only update _user_language from STT if no
-                        # manual language override is active.  When the
-                        # user has explicitly chosen a language (e.g.
-                        # Arabic), stray English numbers / code-switch
-                        # fragments must NOT flip the session language.
-                        if not self.manual_language:
-                            self._user_language = detected_lang
-                        else:
-                            self._user_language = self.manual_language
-
-                        # -------------------------------
-                        # FIX: Repair wrong-language STT output here
-                        # -------------------------------
-                        last_alt = event.alternatives[0]
-                        raw_text = last_alt.text.strip()
-                        target_lang = self.manual_language or self._user_language
-
-                        if is_wrong_script(raw_text):
-                            print(f"⚠️ Repairing last alt in {event.type}: {raw_text}")
-                            repaired = await repair_text(self, raw_text, target_lang)
-                            last_alt.text = repaired
-                        # When manual language is set and STT detected a
-                        # different language, the transcription text may
-                        # be garbled (e.g. Arabic speech rendered as
-                        # English phonemes).  Repair it so the LLM
-                        # receives correct text.
-                        elif (
-                            self.manual_language
-                            and detected_lang != self.manual_language
-                            and raw_text
-                        ):
-                            print(
-                                f"⚠️ Language mismatch: manual={self.manual_language}, "
-                                f"detected={detected_lang}. Repairing: {raw_text}"
-                            )
-                            repaired = await repair_text(
-                                self, raw_text, self.manual_language
-                            )
-                            last_alt.text = repaired
-
-                        # 👂 Capture language from user speech
-                        text = event.alternatives[0].text.lower().strip()
-                        print("🌐 Detected language:", self._user_language)
-                        cfg = get_cfg()
-                        switch_cfg = cfg["agents"]["MallSupportAgent"][
-                            "language_switch"
-                        ]
-
-                        lang_map = {
-                            "arabic": ("ar", switch_cfg.get("arabic", {})),
-                        }
-
-                        for keyword, (lang_code, cfg) in lang_map.items():
-                            if keyword in text:
-                                await self.session.say(cfg.get("notice"))
-                                await asyncio.sleep(0.8)
-                                self.manual_language = self._user_language = lang_code
-                                self.background_audio = BackgroundAudioPlayer(
-                                    ambient_sound=AudioConfig(
-                                        BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8
-                                    ),
-                                )
-                                await self.background_audio.start(
-                                    room=self.room, agent_session=self.session
-                                )
-                                await asyncio.sleep(2.0)
-                                await self.background_audio.aclose()
-                                await self.session.say(cfg.get("greeting", ""))
-                                break
+                        print("🌐 Session language:", self.session_language)
                     yield event
             finally:
                 await utils.aio.cancel_and_wait(forward_task)
+
+    def _tts_for_lang(self, lang: str):
+        """Return the TTS engine for the given language code."""
+        if lang.startswith("ar"):
+            return self.arabic_tts
+        activity = self._get_activity_or_raise()
+        assert activity.tts is not None, "tts_node called but no TTS node is available"
+        return activity.tts
+
+    def _wrap_tts(self, chosen_tts):
+        """Wrap a non-streaming TTS with a StreamAdapter if needed."""
+        if not chosen_tts.capabilities.streaming:
+            return tts.StreamAdapter(
+                tts=chosen_tts,
+                sentence_tokenizer=tokenize.blingfire.SentenceTokenizer(
+                    retain_format=True
+                ),
+            )
+        return chosen_tts
+
+    async def _synthesize_and_yield(self, tts_engine, text_str: str):
+        """Synthesize a string through a TTS engine and yield audio frames."""
+        wrapped = self._wrap_tts(tts_engine)
+        conn_options = self.session.conn_options.tts_conn_options
+        async with wrapped.stream(conn_options=conn_options) as stream:
+            stream.push_text(text_str)
+            stream.end_input()
+            async for ev in stream:
+                yield ev.frame
 
     async def tts_node(
         self,
@@ -386,35 +326,64 @@ class MallSupportAgent(Agent):
         model_settings: ModelSettings,
     ) -> AsyncGenerator[rtc.AudioFrame, None]:
         """
-        Dynamically choose  TTS voice based on detected STT language.
-
+        Dynamically choose TTS voice based on session_language.
+        Handles pending language switches with notice → background audio → greeting.
         """
-        lang = self.manual_language or getattr(self, "_user_language", "en")
-        if self.manual_language == "en":
-            self._user_language = "en"
+        pending_switch = self._pending_lang_switch
+        self._pending_lang_switch = None  # consume it
 
-        if lang.startswith("ar"):
-            print("🗣️ Using Arabic TTS voice")
-            chosen_tts = self.arabic_tts
-        # elif lang.startswith("zh"):
-        #     print("🗣️ Using Mandarin TTS voice")
-        #     chosen_tts = self.mandarin_tts
-        else:
-            activity = self._get_activity_or_raise()
-            assert (
-                activity.tts is not None
-            ), "tts_node called but no TTS node is available"
-            chosen_tts = activity.tts
+        if pending_switch:
+            current_lang = self.session_language
+            cfg = get_cfg()
+            switch_cfg = cfg["agents"]["MallSupportAgent"]["language_switch"]
+            lang_cfg = switch_cfg.get("arabic" if pending_switch == "ar" else "english", {})
 
-        wrapped_tts = chosen_tts
-        if not chosen_tts.capabilities.streaming:
-            wrapped_tts = tts.StreamAdapter(
-                tts=chosen_tts,
-                sentence_tokenizer=tokenize.blingfire.SentenceTokenizer(
-                    retain_format=True
+            # 1) Play notice in the CURRENT voice
+            notice = lang_cfg.get("notice")
+            if notice:
+                current_tts = self._tts_for_lang(current_lang)
+                print(f"🗣️ Playing switch notice in {current_lang}")
+                async for frame in self._synthesize_and_yield(current_tts, notice):
+                    yield frame
+
+            # 2) Pause after notice before background audio
+            await asyncio.sleep(1.5)
+
+            # 3) Switch the session language
+            self.session_language = pending_switch
+            logger.info("Language switched to: %s", pending_switch)
+
+            # 4) Play background typing sound
+            bg_audio = BackgroundAudioPlayer(
+                ambient_sound=AudioConfig(
+                    BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8
                 ),
             )
+            await bg_audio.start(room=self.room, agent_session=self.session)
+            await asyncio.sleep(3.0)
+            await bg_audio.aclose()
 
+            # 5) Pause after background audio before greeting
+            await asyncio.sleep(1.0)
+
+            # 6) Play greeting in the NEW voice
+            greeting = lang_cfg.get("greeting", "")
+            if greeting:
+                new_tts = self._tts_for_lang(pending_switch)
+                print(f"🗣️ Playing greeting in {pending_switch}")
+                async for frame in self._synthesize_and_yield(new_tts, greeting):
+                    yield frame
+
+            # Drain the LLM text (already handled by notice + greeting)
+            async for _ in text:
+                pass
+            return
+
+        # Normal path — no language switch
+        chosen_tts = self._tts_for_lang(self.session_language)
+        print(f"🗣️ Using {'Arabic' if self.session_language.startswith('ar') else 'English'} TTS voice")
+
+        wrapped_tts = self._wrap_tts(chosen_tts)
         conn_options = self.session.conn_options.tts_conn_options
         async with wrapped_tts.stream(conn_options=conn_options) as stream:
 
@@ -433,7 +402,7 @@ class MallSupportAgent(Agent):
     async def on_enter(self):
         """Speaks immediately after the agent becomes active."""
         cfg = get_cfg()
-        self.manual_language = "en"
+        self.session_language = "en"
         if self.audio_recorder:
             self.audio_recorder.start_session(session_id=self.room.name)
         await self.session.say(cfg["greeting"])
