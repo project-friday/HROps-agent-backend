@@ -126,6 +126,7 @@ class MallSupportAgent(Agent):
 
         self.visible_tools = {create_ticket, feedback_sms_tool}
         self.manual_language = None  # tracks manually switched language
+        self._language_switched = False  # ensures language switch only happens once
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -315,7 +316,7 @@ class MallSupportAgent(Agent):
                         }
 
                         for keyword, (lang_code, cfg) in lang_map.items():
-                            if keyword in text:
+                            if keyword in text and not self._language_switched:
                                 await self.session.say(cfg.get("notice"))
                                 await asyncio.sleep(0.8)
                                 self.manual_language = self._user_language = lang_code
@@ -330,6 +331,7 @@ class MallSupportAgent(Agent):
                                 await asyncio.sleep(2.0)
                                 await self.background_audio.aclose()
                                 await self.session.say(cfg.get("greeting", ""))
+                                self._language_switched = True
                                 break
                     yield event
             finally:
