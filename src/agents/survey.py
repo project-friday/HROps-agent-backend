@@ -96,7 +96,7 @@ class SurveyAgent(Agent):
         }
 
         self.manual_language = None  # tracks manually switched language
-        self._user_language = "en"   # default to English
+        self._user_language = "en"  # default to English
 
     async def _send_websocket_message(
         self, action: str, result: Dict[str, Any] = None, tool_func=None
@@ -233,10 +233,9 @@ class SurveyAgent(Agent):
 
                         # Preserve manually / session-set language;
                         # only update from STT when no override exists.
-                        session_lang = (
-                            getattr(self.session, "state", {}).get("language")
-                            or getattr(self, "manual_language", None)
-                        )
+                        session_lang = getattr(self.session, "state", {}).get(
+                            "language"
+                        ) or getattr(self, "manual_language", None)
                         if not session_lang:
                             self._user_language = detected_lang
                         else:
@@ -249,17 +248,13 @@ class SurveyAgent(Agent):
                             repaired = await repair_text(self, raw_text, target_lang)
                             last_alt.text = repaired
                         elif (
-                            session_lang
-                            and detected_lang != session_lang
-                            and raw_text
+                            session_lang and detected_lang != session_lang and raw_text
                         ):
                             print(
                                 f"⚠️ Language mismatch: session={session_lang}, "
                                 f"detected={detected_lang}. Repairing: {raw_text}"
                             )
-                            repaired = await repair_text(
-                                self, raw_text, session_lang
-                            )
+                            repaired = await repair_text(self, raw_text, session_lang)
                             last_alt.text = repaired
 
                         print("🌐 Detected survey language:", self._user_language)

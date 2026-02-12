@@ -11,8 +11,10 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 # from src.agents.onboarding import OnboardingAgent
-from livekit.agents import function_tool  # decorator used by the agent to call tools
-from livekit.agents import RunContext
+from livekit.agents import (  # decorator used by the agent to call tools
+    RunContext,
+    function_tool,
+)
 
 from src.utils.emails import send_email  # SES email sender
 
@@ -130,7 +132,65 @@ async def create_ticket(phone_number: int, issue_description: str) -> dict:
 
     return ticket
 
-@function_tool(description="Send feedback SMS link when customer declines to rate on the call.")
+
+@function_tool(
+    description=(
+        "Switch the conversation language. Call this ONLY when the user explicitly "
+        "asks to change language (e.g. 'speak Arabic', 'switch to English', 'تكلم عربي'). "
+        "Do NOT call this when the user merely mentions a language in a question."
+    )
+)
+async def switch_language(language: str) -> dict:
+    """
+    Signal a language switch. The actual TTS voice switch, notice, and
+    greeting are handled by the tts_node when it sees the pending switch.
+    language: 'ar' for Arabic, 'en' for English.
+    """
+    lang = language.lower().strip()
+    if lang not in ("ar", "en"):
+        return {
+            "status": "error",
+            "message": f"Unsupported language: {language}. Only 'en' and 'ar' are supported.",
+        }
+
+    return {"status": "ok", "language": lang}
+
+
+@function_tool(
+    description=(
+        "Forward the call to a human agent. Call this ONLY after the user has "
+        "consented to being transferred to a human agent. The system will play "
+        "hold music automatically — do NOT add your own transfer message."
+    )
+)
+async def forward_to_human(context: RunContext) -> dict:
+    """
+    Plays hold music and simulates forwarding the call to a human agent.
+    """
+    import asyncio
+
+    from livekit.agents.voice.background_audio import (
+        AudioConfig,
+        BackgroundAudioPlayer,
+        BuiltinAudioClip,
+    )
+
+    agent = context.session.current_agent
+
+    # Play hold music / office ambience
+    bg_audio = BackgroundAudioPlayer(
+        ambient_sound=AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.8),
+    )
+    await bg_audio.start(room=agent.room, agent_session=agent.session)
+    await asyncio.sleep(5.0)
+    await bg_audio.aclose()
+
+    return {"status": "forwarded to human agent", "forwarded": True}
+
+
+@function_tool(
+    description="Send feedback SMS link when customer declines to rate on the call."
+)
 async def feedback_sms_tool(phone_number: str) -> dict:
     """UI-only tool – shows confirmation on screen when feedback SMS is sent."""
     link = "https://feedback.thedubaimall.ae/rate"
